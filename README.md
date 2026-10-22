@@ -17,13 +17,12 @@ This reads `data/age_data_oxford.csv` and `data/msoa_boundaries_2021.geojson`
 and writes `outputs/oxford_over_65_map.html`. Open that HTML file in a browser.
 The map uses a locally rendered grayscale basemap image under the data polygons;
 it does not request background tiles from OpenStreetMap's tile servers.
-The map settings are loaded and validated from `config.yaml` every run. The
-strict `>65` cutoff in the default config includes ages 66 through 100 and over;
-age 65 is not included.
+The map settings are loaded and validated from `config.yaml` every run.
 
 ```yaml
 transparency: 0.32
-cutoff_age: 65
+cutoff_age_lo: 65
+cutoff_age_hi: null
 ```
 
 `transparency` must be between `0` (opaque) and `1` (invisible). `cutoff_age`
