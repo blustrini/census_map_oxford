@@ -1,0 +1,26 @@
+{
+  "bounds": [
+    [
+      51.665963811242406,
+      -1.3766672246670775
+    ],
+    [
+      51.841231529895545,
+      -1.1033997752162221
+    ]
+  ],
+  "buffer_metres": 5000,
+  "image_crs": "EPSG:3857",
+  "source": "https://download.geofabrik.de/europe/united-kingdom/england/oxfordshire-latest-free.gpkg.zip",
+  "source_data_date": "2026-10-21T20:21:46Z",
+  "license": "Open Database License (ODbL) 1.0",
+  "attribution": "\u00a9 OpenStreetMap contributors",
+  "layers": [
+    "gis_osm_landuse_a_free",
+    "gis_osm_water_a_free",
+    "gis_osm_buildings_a_free",
+    "gis_osm_roads_free",
+    "gis_osm_waterways_free",
+    "gis_osm_places_free"
+  ]
+}

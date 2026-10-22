@@ -1,0 +1,6 @@
+# Fraction of polygon fill that is transparent: 0 is opaque, 1 is invisible.
+transparency: 0.32
+
+# Include residents whose age code is strictly greater than this value.
+cutoff_age_hi: 26
+cutoff_age_lo: 17

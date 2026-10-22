@@ -1,0 +1,25 @@
+[project]
+name = "census"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Bernardo Lustrini", email = "bernardo.lustrini@oxehealth.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "folium>=0.20.0",
+    "geopandas>=1.2.0",
+    "mapclassify>=2.11.0",
+    "matplotlib>=3.11.2",
+    "pandas>=3.1.0",
+    "pyogrio>=0.13.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+census = "census:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
