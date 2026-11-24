@@ -24,7 +24,7 @@ SOURCE_URL = (
     "oxfordshire-latest-free.gpkg.zip"
 )
 BUFFER_METRES = 5_000
-RASTER_DPI = 360
+RASTER_DPI = 500
 TARGET_CRS = "EPSG:27700"
 IMAGE_CRS = "EPSG:3857"
 LAYERS = (
@@ -38,6 +38,10 @@ LAYERS = (
 )
 GREEN_LANDUSE = {"park", "recreation_ground", "forest", "grass", "meadow", "allotments"}
 WATER_CLASSES = {"water", "riverbank", "reservoir", "wetland_marsh"}
+PLACE_LABEL_OFFSETS = {
+    "Oxford": (5, -12),
+    "City Centre": (5, 10),
+}
 
 
 def download_extract(destination: Path, source_archive: Path | None) -> tuple[Path, str]:
@@ -202,10 +206,11 @@ def render_basemap(
             if place_class not in {"city", "town", "suburb", "village"}:
                 continue
             size = 8 if place_class == "city" else 6 if place_class == "town" else 5
+            label = str(place["name"])
             text = axis.annotate(
-                str(place["name"]),
+                label,
                 (place.geometry.x, place.geometry.y),
-                xytext=(3, 3),
+                xytext=PLACE_LABEL_OFFSETS.get(label, (3, 3)),
                 textcoords="offset points",
                 fontsize=size,
                 color="#5e5d59",
