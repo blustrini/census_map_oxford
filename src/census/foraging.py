@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from dataclasses import dataclass
 from html import escape
@@ -14,11 +15,9 @@ import yaml
 from census.map_utils import add_basemap, load_basemap_bounds
 
 LAYER_COLUMN = "layer"
-LABEL_COLUMN = "label"
-DESCRIPTION_COLUMN = "description"
 LATITUDE_COLUMN = "latitude"
 LONGITUDE_COLUMN = "longitude"
-REQUIRED_COLUMNS = {LAYER_COLUMN, LABEL_COLUMN, LATITUDE_COLUMN, LONGITUDE_COLUMN}
+REQUIRED_COLUMNS = {LAYER_COLUMN, LATITUDE_COLUMN, LONGITUDE_COLUMN}
 
 LAYER_COLORS = {
     "Apples and Pears": "#e41a1c",
@@ -29,19 +28,20 @@ LAYER_COLORS = {
     "Additions in 2017": "#a65628",
     "Uncategorised": "#666666",
 }
-FORAGING_SETTING_KEYS = {"alpha", "dot_sizes"}
+FORAGING_SETTING_KEYS = {"alpha", "reveal_radius_meters", "knowledge_scores"}
 DEFAULT_ALPHA = 0.75
-DEFAULT_DOT_SIZE = 5
+DEFAULT_REVEAL_RADIUS_METERS = 900
 
 
 @dataclass(frozen=True)
 class ForagingMapSettings:
     alpha: float
-    dot_sizes: Mapping[str, float]
+    reveal_radius_meters: int
+    knowledge_scores: Mapping[str, Mapping[str, float]]
 
 
 def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
-    """Load foraging marker sizes and shared alpha from YAML."""
+    """Load and validate age/category knowledge scores and reveal styling."""
     try:
         with config_path.open(encoding="utf-8") as config_file:
             config = yaml.safe_load(config_file)
@@ -71,33 +71,63 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
     ):
         raise ValueError("alpha must be a number between 0 and 1")
 
-    dot_sizes = config["dot_sizes"]
-    if not isinstance(dot_sizes, dict) or not all(
-        isinstance(layer, str) for layer in dot_sizes
+    reveal_radius_meters = config["reveal_radius_meters"]
+    if (
+        isinstance(reveal_radius_meters, bool)
+        or not isinstance(reveal_radius_meters, int)
+        or not 100 <= reveal_radius_meters <= 10_000
     ):
-        raise ValueError("dot_sizes must be a mapping of category names to radii")
-    missing_layers = LAYER_COLORS.keys() - dot_sizes.keys()
-    unexpected_layers = dot_sizes.keys() - LAYER_COLORS.keys()
-    if missing_layers or unexpected_layers:
-        details = []
-        if missing_layers:
-            details.append(f"missing categories: {sorted(missing_layers)}")
-        if unexpected_layers:
-            details.append(f"unknown categories: {sorted(unexpected_layers)}")
-        raise ValueError("Invalid dot_sizes (" + "; ".join(details) + ")")
+        raise ValueError("reveal_radius_meters must be a whole number from 100 to 10000")
 
-    validated_sizes: dict[str, float] = {}
-    for layer, size in dot_sizes.items():
+    knowledge_scores = config["knowledge_scores"]
+    if not isinstance(knowledge_scores, dict) or not knowledge_scores:
+        raise ValueError("knowledge_scores must map age brackets to category scores")
+
+    validated_scores: dict[str, dict[str, float]] = {}
+    for age_bracket, category_scores in knowledge_scores.items():
         if (
-            isinstance(size, bool)
-            or not isinstance(size, (int, float))
-            or not math.isfinite(size)
-            or not 0 < size <= 50
+            not isinstance(age_bracket, str)
+            or not age_bracket.strip()
+            or not isinstance(category_scores, dict)
+            or not all(isinstance(layer, str) for layer in category_scores)
         ):
-            raise ValueError(f"dot_sizes[{layer!r}] must be greater than 0 and at most 50")
-        validated_sizes[layer] = float(size)
+            raise ValueError("Each knowledge_scores entry must be an age bracket mapping")
+        missing_layers = LAYER_COLORS.keys() - category_scores.keys()
+        unexpected_layers = category_scores.keys() - LAYER_COLORS.keys()
+        if missing_layers or unexpected_layers:
+            details = []
+            if missing_layers:
+                details.append(f"missing categories: {sorted(missing_layers)}")
+            if unexpected_layers:
+                details.append(f"unknown categories: {sorted(unexpected_layers)}")
+            raise ValueError(
+                f"Invalid categories for age bracket {age_bracket!r} ("
+                + "; ".join(details)
+                + ")"
+            )
 
-    return ForagingMapSettings(alpha=float(alpha), dot_sizes=validated_sizes)
+        validated_category_scores: dict[str, float] = {}
+        for layer, score in category_scores.items():
+            if (
+                isinstance(score, bool)
+                or not isinstance(score, (int, float))
+                or not math.isfinite(score)
+                or not 0 <= score <= 1
+            ):
+                raise ValueError(
+                    f"knowledge_scores[{age_bracket!r}][{layer!r}] "
+                    "must be a number between 0 and 1"
+                )
+            validated_category_scores[layer] = float(score)
+        if not any(validated_category_scores.values()):
+            raise ValueError(f"Age bracket {age_bracket!r} needs at least one positive score")
+        validated_scores[age_bracket] = validated_category_scores
+
+    return ForagingMapSettings(
+        alpha=float(alpha),
+        reveal_radius_meters=reveal_radius_meters,
+        knowledge_scores=validated_scores,
+    )
 
 
 def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
@@ -111,7 +141,7 @@ def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
     if locations.empty:
         raise ValueError("Foraging data contains no locations")
 
-    for column in (LAYER_COLUMN, LABEL_COLUMN):
+    for column in (LAYER_COLUMN,):
         locations[column] = locations[column].astype("string").str.strip()
         if locations[column].isna().any() or locations[column].eq("").any():
             raise ValueError(f"Foraging data contains empty {column} values")
@@ -129,28 +159,199 @@ def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
     unknown_layers = sorted(set(locations[LAYER_COLUMN]) - LAYER_COLORS.keys())
     if unknown_layers:
         raise ValueError(f"Foraging data contains unknown layers: {unknown_layers}")
-    if DESCRIPTION_COLUMN not in locations.columns:
-        locations[DESCRIPTION_COLUMN] = ""
     return locations
 
 
-def _add_legend(map_view: folium.Map, layers: list[str]) -> None:
-    entries = "".join(
-        "<div style='margin: 3px 0;'>"
-        f"<span style='display:inline-block;width:10px;height:10px;"
-        f"border-radius:50%;background:{LAYER_COLORS[layer]};margin-right:7px;'></span>"
-        f"{escape(layer)}</div>"
-        for layer in layers
+def _add_reveal_controls(
+    map_view: folium.Map,
+    color_overlay: folium.raster_layers.ImageOverlay,
+    image_bounds: list[list[float]],
+    locations_by_category: Mapping[str, list[list[float]]],
+    settings: ForagingMapSettings,
+    initial_age: str,
+) -> None:
+    age_brackets = list(settings.knowledge_scores)
+    categories = sorted(LAYER_COLORS)
+    first_option = "<option value='__all__'>All categories</option>"
+    category_options = first_option + "".join(
+        f"<option value='{escape(category, quote=True)}'>"
+        f"{escape(category)}</option>"
+        for category in categories
+    )
+    age_options = "".join(
+        f"<option value='{escape(age, quote=True)}'>{escape(age)}</option>"
+        for age in age_brackets
     )
     map_view.get_root().html.add_child(
         folium.Element(
-            "<div style='position: fixed; bottom: 24px; right: 10px; z-index: 9999; "
-            "background: rgba(255,255,255,.95); padding: 8px 10px; "
-            "border-radius: 4px; box-shadow: 0 1px 5px #888; "
-            "font: 12px/1.4 sans-serif;'><strong>Foraging categories</strong>"
-            f"{entries}</div>"
+            "<div style='position:fixed;top:16px;right:16px;z-index:9999;"
+            "background:rgba(255,255,255,.96);padding:10px 12px;border-radius:4px;"
+            "box-shadow:0 1px 5px #888;font:13px/1.6 sans-serif;'>"
+            "<label>Age bracket<br><select id='foraging-age' style='width:190px;'>"
+            f"{age_options}</select></label><br>"
+            "<label>Plant category<br><select id='foraging-category' "
+            f"style='width:190px;'>{category_options}</select></label></div>"
         )
     )
+    map_view.get_root().html.add_child(
+        folium.Element(
+            "<div style='position:fixed;bottom:24px;right:10px;z-index:9999;"
+            "background:rgba(255,255,255,.95);padding:8px 10px;border-radius:4px;"
+            "box-shadow:0 1px 5px #888;font:12px/1.4 sans-serif;width:230px;'>"
+            "<strong>Colour reveal</strong>"
+            "<div style='height:14px;margin:6px 0 2px;background:linear-gradient("
+            "to right,#bdbdbd 0%,#f2f2f2 45%,#dce9d3 55%,#438e55 100%);'></div>"
+            "<div style='display:flex;justify-content:space-between;'>"
+            "<span>Grayscale</span><span>Full colour</span></div>"
+            "<div style='color:#555;margin-top:4px;'>Colour appears near foraging "
+            "locations and fades with distance.</div>"
+            "<div style='color:#555;'>Scores are illustrative placeholders.</div></div>"
+        )
+    )
+
+    locations_json = json.dumps(
+        locations_by_category,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    scores_json = json.dumps(
+        {age: dict(scores) for age, scores in settings.knowledge_scores.items()},
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    script = f"""
+    window.addEventListener('load', function() {{
+    const locationsByCategory = {locations_json};
+    const knowledgeScores = {scores_json};
+    const foragingMap = {map_view.get_name()};
+    const colorOverlay = {color_overlay.get_name()};
+    const imageBounds = {json.dumps(image_bounds)};
+    const revealRadiusMeters = {settings.reveal_radius_meters};
+    const revealAlpha = {settings.alpha};
+    const foragingAgeSelect = document.getElementById('foraging-age');
+    const foragingCategorySelect = document.getElementById('foraging-category');
+    foragingAgeSelect.value = {json.dumps(initial_age)};
+    const revealCanvas = document.createElement('canvas');
+    const revealMask = document.createElement('canvas');
+    revealCanvas.style.position = 'absolute';
+    revealCanvas.style.pointerEvents = 'none';
+    revealCanvas.style.zIndex = '3';
+    foragingMap.getPanes().overlayPane.appendChild(revealCanvas);
+
+    function drawReveal() {{
+        const colorImage = colorOverlay._image;
+        if (!colorImage || !colorImage.complete || !colorImage.naturalWidth) return;
+        const size = foragingMap.getSize();
+        const pixelRatio = window.devicePixelRatio || 1;
+        for (const canvas of [revealCanvas, revealMask]) {{
+            canvas.width = Math.round(size.x * pixelRatio);
+            canvas.height = Math.round(size.y * pixelRatio);
+            canvas.style.width = size.x + 'px';
+            canvas.style.height = size.y + 'px';
+        }}
+        const origin = foragingMap.containerPointToLayerPoint([0, 0]);
+        L.DomUtil.setPosition(revealCanvas, origin);
+        const ctx = revealCanvas.getContext('2d');
+        const mask = revealMask.getContext('2d');
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        mask.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        ctx.clearRect(0, 0, size.x, size.y);
+        mask.clearRect(0, 0, size.x, size.y);
+
+        const [[south, west], [north, east]] = imageBounds;
+        const upperLeft = foragingMap.latLngToLayerPoint([north, west]);
+        const lowerRight = foragingMap.latLngToLayerPoint([south, east]);
+        ctx.drawImage(
+            colorImage,
+            upperLeft.x - origin.x,
+            upperLeft.y - origin.y,
+            lowerRight.x - upperLeft.x,
+            lowerRight.y - upperLeft.y
+        );
+
+        const age = foragingAgeSelect.value;
+        const category = foragingCategorySelect.value;
+        const selectedCategories = category === '__all__'
+            ? Object.keys(locationsByCategory)
+            : [category];
+        const points = selectedCategories.flatMap((layer) =>
+            locationsByCategory[layer].map(([latitude, longitude]) => [
+                latitude,
+                longitude,
+                knowledgeScores[age][layer]
+            ])
+        );
+        for (const [latitude, longitude, score] of points) {{
+            const point = foragingMap.latLngToLayerPoint([latitude, longitude]);
+            const x = point.x - origin.x;
+            const y = point.y - origin.y;
+            const metresPerPixel = Math.cos(latitude * Math.PI / 180)
+                * 2 * Math.PI * 6378137 / (256 * Math.pow(2, foragingMap.getZoom()));
+            const radius = revealRadiusMeters / metresPerPixel;
+            const opacity = Math.min(1, revealAlpha * score);
+            if (opacity <= 0 || radius <= 0) continue;
+            const gradient = mask.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, 'rgba(255,255,255,' + opacity + ')');
+            gradient.addColorStop(0.65, 'rgba(255,255,255,' + opacity * 0.55 + ')');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            mask.fillStyle = gradient;
+            mask.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        }}
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(
+            revealMask,
+            0, 0, revealMask.width, revealMask.height,
+            0, 0, size.x, size.y
+        );
+        ctx.globalCompositeOperation = 'source-over';
+    }}
+
+    function updateReveal() {{
+        drawReveal();
+    }}
+    foragingMap.on('movestart zoomstart', function() {{
+        revealCanvas.style.opacity = '0';
+    }});
+    foragingMap.on('moveend zoomend', function() {{
+        drawReveal();
+        revealCanvas.style.opacity = '1';
+    }});
+    if (colorOverlay._image && colorOverlay._image.complete) {{
+        updateReveal();
+    }} else {{
+        colorOverlay.once('load', updateReveal);
+    }}
+    foragingMap.on('resize', drawReveal);
+    window.addEventListener('resize', drawReveal);
+    foragingAgeSelect.addEventListener('change', updateReveal);
+    foragingCategorySelect.addEventListener('change', updateReveal);
+    }});
+    """
+    map_view.get_root().script.add_child(folium.Element(script))
+
+
+def _load_color_basemap_path(
+    metadata_path: Path,
+    grayscale_path: Path,
+    configured_path: Path | None,
+) -> Path:
+    if configured_path is not None:
+        color_path = configured_path
+    else:
+        with metadata_path.open(encoding="utf-8") as metadata_file:
+            metadata = json.load(metadata_file)
+        color_name = metadata.get("color_image") if isinstance(metadata, dict) else None
+        if color_name is not None and not isinstance(color_name, str):
+            raise ValueError(f"Basemap metadata has invalid color_image: {metadata_path}")
+        if color_name:
+            color_path = metadata_path.parent / color_name
+        else:
+            color_path = grayscale_path.with_name(
+                f"{grayscale_path.stem}_color{grayscale_path.suffix}"
+            )
+    if not color_path.is_file():
+        raise ValueError(f"Colour basemap image does not exist: {color_path}")
+    return color_path
 
 
 def create_foraging_map(
@@ -159,15 +360,24 @@ def create_foraging_map(
     basemap_image_path: Path,
     basemap_metadata_path: Path,
     settings: ForagingMapSettings | None = None,
+    color_basemap_image_path: Path | None = None,
 ) -> tuple[int, int]:
-    """Create a category-coloured foraging map; return (plotted, out of bounds)."""
+    """Reveal colour around configured foraging locations; return plotted/excluded counts."""
     if settings is None:
         settings = ForagingMapSettings(
             alpha=DEFAULT_ALPHA,
-            dot_sizes={layer: DEFAULT_DOT_SIZE for layer in LAYER_COLORS},
+            reveal_radius_meters=DEFAULT_REVEAL_RADIUS_METERS,
+            knowledge_scores={
+                "All ages": {layer: 1.0 for layer in LAYER_COLORS}
+            },
         )
     locations = load_foraging_locations(foraging_data_path)
     image_bounds = load_basemap_bounds(basemap_metadata_path, basemap_image_path)
+    color_image_path = _load_color_basemap_path(
+        basemap_metadata_path,
+        basemap_image_path,
+        color_basemap_image_path,
+    )
     (min_lat, min_lon), (max_lat, max_lon) = image_bounds
 
     in_bounds = locations[
@@ -186,41 +396,38 @@ def create_foraging_map(
         control_scale=True,
     )
     add_basemap(map_view, basemap_image_path, image_bounds)
+    color_overlay = folium.raster_layers.ImageOverlay(
+        image=str(color_image_path),
+        bounds=image_bounds,
+        name="Colour basemap revealed near foraging locations",
+        interactive=False,
+        cross_origin=False,
+        opacity=0,
+        zIndex=2,
+    ).add_to(map_view)
 
-    present_layers = sorted(in_bounds[LAYER_COLUMN].unique())
-    for layer in present_layers:
-        layer_locations = in_bounds.loc[in_bounds[LAYER_COLUMN] == layer]
-        feature_group = folium.FeatureGroup(
-            name=f"{layer} ({len(layer_locations)})",
-            show=True,
-        )
-        color = LAYER_COLORS[layer]
-        for _, location in layer_locations.iterrows():
-            label = escape(str(location[LABEL_COLUMN]))
-            description = location[DESCRIPTION_COLUMN]
-            tooltip_text = f"<strong>{label}</strong><br>{escape(layer)}"
-            if pd.notna(description) and str(description).strip():
-                tooltip_text += f"<br>{escape(str(description).strip())}"
-            folium.CircleMarker(
-                location=(location[LATITUDE_COLUMN], location[LONGITUDE_COLUMN]),
-                radius=settings.dot_sizes[layer],
-                color=color,
-                opacity=settings.alpha,
-                weight=1,
-                fill=True,
-                fill_color=color,
-                fill_opacity=settings.alpha,
-                tooltip=folium.Tooltip(tooltip_text, sticky=False),
-            ).add_to(feature_group)
-        feature_group.add_to(map_view)
+    locations_by_category: dict[str, list[list[float]]] = {}
+    for category in LAYER_COLORS:
+        category_locations = in_bounds.loc[in_bounds[LAYER_COLUMN] == category]
+        locations_by_category[category] = [
+            [float(location[LATITUDE_COLUMN]), float(location[LONGITUDE_COLUMN])]
+            for _, location in category_locations.iterrows()
+        ]
 
-    folium.LayerControl(collapsed=False).add_to(map_view)
-    _add_legend(map_view, present_layers)
+    age_brackets = list(settings.knowledge_scores)
+    _add_reveal_controls(
+        map_view,
+        color_overlay,
+        image_bounds,
+        locations_by_category,
+        settings,
+        age_brackets[-1],
+    )
     title = folium.Element(
         "<div style='position: fixed; top: 16px; left: 60px; z-index: 9999; "
         "background: white; padding: 10px 14px; border-radius: 4px; "
         "box-shadow: 0 1px 5px #888; font: 16px/1.4 sans-serif;'>"
-        f"<strong>Oxford foraging locations</strong><br>{len(in_bounds)} locations</div>"
+        f"<strong>Oxford comes alive</strong><br>{len(in_bounds)} foraging locations</div>"
     )
     map_view.get_root().html.add_child(title)
     map_view.fit_bounds(image_bounds)
@@ -260,6 +467,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Path to the basemap JSON containing geographic image bounds",
     )
     parser.add_argument(
+        "--color-basemap-image",
+        type=Path,
+        help="Path to the full-colour basemap PNG (defaults to metadata/configured sibling)",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=project_root / "outputs" / "oxford_foraging_map.html",
@@ -275,6 +487,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             args.basemap_image,
             args.basemap_metadata,
             settings,
+            args.color_basemap_image,
         )
     except (OSError, ValueError) as error:
         parser.error(str(error))

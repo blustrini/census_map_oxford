@@ -52,19 +52,27 @@ uv run census-foraging
 ```
 
 This reads `data/oxford_foraging.csv` and writes
-`outputs/oxford_foraging_map.html`. Locations are shown as small circles,
-coloured by category; hover over a circle for its label and description, and
-use the layer control to toggle categories. A location outside the shared
-basemap bounds is omitted and reported (the source currently contains one such
-coordinate). Marker settings are loaded from `foraging_config.yaml`: adjust
-`dot_sizes` (radius in pixels) per category and `alpha` (shared marker opacity,
-from 0 to 1). Pass `--config` to use another YAML file. Input and output paths
-can be changed with `--foraging-data` and `--output`; the same `--basemap-image`
-and `--basemap-metadata` options are available as for the age map.
+`outputs/oxford_foraging_map.html`. It layers matching grayscale and colour
+versions of the basemap. The colour version is revealed around locations in
+the selected age bracket and category, fading back to grayscale with distance;
+overlapping areas reveal more colour. A location outside the shared basemap
+bounds is omitted and reported (the source currently contains one such
+coordinate).
+
+Reveal settings are loaded from `foraging_config.yaml`. `knowledge_scores`
+contains a 0-to-1 value for every age-bracket/category pair; `alpha` sets the
+maximum reveal strength, and `reveal_radius_meters` controls how far colour
+spreads from each location. The checked-in scores are illustrative
+placeholders, deliberately set so older brackets score higher across all
+categories. They are not survey findings and should be replaced with collected
+results. Pass `--config` to use another YAML file. Input and output paths can
+be changed with `--foraging-data`, `--output`, and `--color-basemap-image`;
+the grayscale image and metadata options are shared with the age map.
 
 ## Local basemap
 
-The local background assets are in `assets/oxford_basemap.png` and
+The local background assets are in `assets/oxford_basemap.png` (grayscale),
+`assets/oxford_basemap_color.png` (colour), and
 `assets/oxford_basemap.json`. They cover Oxford's MSOA footprint plus a 5 km
 buffer. To refresh them from Geofabrik's Oxfordshire OpenStreetMap extract, run
 (this downloads the latest 49 MB regional extract before clipping):
@@ -75,8 +83,8 @@ uv run python scripts/build_basemap.py
 
 The build writes clipped vector features to `assets/oxford_osm.gpkg` for
 re-rendering and inspection; that larger intermediate is ignored by Git. The
-PNG and bounds metadata are used by the generated HTML; the PNG is embedded in
-the page. The map credits OpenStreetMap contributors; source data is licensed
+PNGs and bounds metadata are used by the generated HTML; both images are
+embedded in the page. The map credits OpenStreetMap contributors; source data is licensed
 under ODbL 1.0. No background tiles are requested externally. Folium still
 loads Leaflet and supporting libraries from CDNs, so interactive map controls
 require internet access.

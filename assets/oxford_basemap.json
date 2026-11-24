@@ -22,5 +22,6 @@
     "gis_osm_roads_free",
     "gis_osm_waterways_free",
     "gis_osm_places_free"
-  ]
+  ],
+  "color_image": "oxford_basemap_color.png"
 }

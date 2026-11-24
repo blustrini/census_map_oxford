@@ -50,7 +50,7 @@ def add_basemap(
         name="Local OpenStreetMap basemap",
         interactive=False,
         cross_origin=False,
-        zindex=1,
+        zIndex=1,
     ).add_to(map_view)
     map_view.get_root().html.add_child(
         folium.Element(

@@ -13,6 +13,7 @@ dependencies = [
     "mapclassify>=2.11.0",
     "matplotlib>=3.11.2",
     "pandas>=3.1.0",
+    "pillow>=12.0.0",
     "pyogrio>=0.13.0",
     "pyyaml>=6.0.3",
 ]

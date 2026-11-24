@@ -14,6 +14,7 @@ import geopandas as gpd
 import matplotlib
 import pyogrio
 from matplotlib import patheffects
+from PIL import Image
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -38,6 +39,34 @@ LAYERS = (
 )
 GREEN_LANDUSE = {"park", "recreation_ground", "forest", "grass", "meadow", "allotments"}
 WATER_CLASSES = {"water", "riverbank", "reservoir", "wetland_marsh"}
+BASEMAP_PALETTES = {
+    "grayscale": {
+        "background": "#d8d8d8",
+        "green_landuse": "#cccccc",
+        "other_landuse": "#d3d3d3",
+        "natural": "#c7c7c7",
+        "buildings": "#c1c1c1",
+        "water": "#bababa",
+        "water_edge": "#adadad",
+        "waterways": "#a8a8a8",
+        "minor_roads": "#e4e4e4",
+        "major_roads": "#eaeaea",
+        "primary_roads": "#f0f0f0",
+    },
+    "color": {
+        "background": "#f6f5ef",
+        "green_landuse": "#bfe39e",
+        "other_landuse": "#edeae0",
+        "natural": "#9fd18b",
+        "buildings": "#dfd7c8",
+        "water": "#9ad0e2",
+        "water_edge": "#78b4c9",
+        "waterways": "#84c2d8",
+        "minor_roads": "#ffffff",
+        "major_roads": "#fcf6e3",
+        "primary_roads": "#f6df9b",
+    },
+}
 PLACE_LABEL_OFFSETS = {
     "Oxford": (5, -12),
     "City Centre": (5, 10),
@@ -132,33 +161,40 @@ def render_basemap(
     layers: dict[str, gpd.GeoDataFrame],
     image_path: Path,
     image_extent: tuple[float, float, float, float],
+    *,
+    grayscale: bool = True,
 ) -> None:
+    palette = BASEMAP_PALETTES["grayscale" if grayscale else "color"]
     min_x, min_y, max_x, max_y = image_extent
     figure_width = 16
     figure_height = figure_width * (max_y - min_y) / (max_x - min_x)
     figure, axis = plt.subplots(figsize=(figure_width, figure_height), dpi=RASTER_DPI)
-    axis.set_facecolor("#f4f3f0")
-    figure.patch.set_facecolor("#f4f3f0")
+    axis.set_facecolor(palette["background"])
+    figure.patch.set_facecolor(palette["background"])
 
     landuse = layers.get("gis_osm_landuse_a_free")
     if landuse is not None:
         classes = landuse["fclass"].fillna("")
         landuse.loc[classes.isin(GREEN_LANDUSE)].plot(
-            ax=axis, color="#e2e7dc", edgecolor="none", zorder=1
+            ax=axis, color=palette["green_landuse"], edgecolor="none", zorder=1
         )
         landuse.loc[~classes.isin(GREEN_LANDUSE)].plot(
-            ax=axis, color="#f0efec", edgecolor="none", zorder=1
+            ax=axis, color=palette["other_landuse"], edgecolor="none", zorder=1
         )
     natural = layers.get("gis_osm_natural_a_free")
     if natural is not None:
-        natural.plot(ax=axis, color="#e8e9e4", edgecolor="none", zorder=2)
+        natural.plot(ax=axis, color=palette["natural"], edgecolor="none", zorder=2)
     buildings = layers.get("gis_osm_buildings_a_free")
     if buildings is not None:
-        buildings.plot(ax=axis, color="#e5e3df", edgecolor="none", zorder=3)
+        buildings.plot(ax=axis, color=palette["buildings"], edgecolor="none", zorder=3)
     water = layers.get("gis_osm_water_a_free")
     if water is not None:
         water.loc[water["fclass"].isin(WATER_CLASSES)].plot(
-            ax=axis, color="#dce5e8", edgecolor="#cad8dc", linewidth=0.2, zorder=4
+            ax=axis,
+            color=palette["water"],
+            edgecolor=palette["water_edge"],
+            linewidth=0.2,
+            zorder=4,
         )
     roads = layers.get("gis_osm_roads_free")
     if roads is not None:
@@ -174,11 +210,16 @@ def render_basemap(
                     "cycleway",
                     "path",
                 },
-                "#ffffff",
+                palette["minor_roads"],
                 0.30,
                 5,
             ),
-            ({"tertiary", "tertiary_link", "secondary", "secondary_link"}, "#ffffff", 0.55, 6),
+            (
+                {"tertiary", "tertiary_link", "secondary", "secondary_link"},
+                palette["major_roads"],
+                0.55,
+                6,
+            ),
             (
                 {
                     "primary",
@@ -188,7 +229,7 @@ def render_basemap(
                     "motorway",
                     "motorway_link",
                 },
-                "#ffffff",
+                palette["primary_roads"],
                 0.9,
                 7,
             ),
@@ -198,7 +239,7 @@ def render_basemap(
             )
     waterways = layers.get("gis_osm_waterways_free")
     if waterways is not None:
-        waterways.plot(ax=axis, color="#b9cbd0", linewidth=0.65, zorder=8)
+        waterways.plot(ax=axis, color=palette["waterways"], linewidth=0.65, zorder=8)
     places = layers.get("gis_osm_places_free")
     if places is not None:
         for _, place in places.loc[places["name"].notna()].iterrows():
@@ -217,7 +258,7 @@ def render_basemap(
                 zorder=9,
             )
             text.set_path_effects(
-                [patheffects.withStroke(linewidth=2, foreground="#f4f3f0")]
+                [patheffects.withStroke(linewidth=2, foreground=palette["background"])]
             )
 
     axis.set_xlim(min_x, max_x)
@@ -227,6 +268,14 @@ def render_basemap(
     figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
     figure.savefig(image_path, dpi=RASTER_DPI, facecolor=figure.get_facecolor())
     plt.close(figure)
+    optimized_image_path = image_path.with_name(f"{image_path.stem}_optimized.png")
+    with Image.open(image_path) as rendered_image:
+        rendered_image.convert("RGB").quantize(
+            colors=256,
+            method=Image.Quantize.MEDIANCUT,
+            dither=Image.Dither.NONE,
+        ).save(optimized_image_path, optimize=True)
+    os.replace(optimized_image_path, image_path)
 
 
 def build_basemap(
@@ -234,19 +283,29 @@ def build_basemap(
     vector_output: Path,
     image_output: Path,
     source_archive: Path | None = None,
+    color_image_output: Path | None = None,
 ) -> None:
+    if color_image_output is None:
+        color_image_output = image_output.with_name(
+            f"{image_output.stem}_color{image_output.suffix}"
+        )
+    if color_image_output.resolve() == image_output.resolve():
+        raise ValueError("Grayscale and colour basemap outputs must be different files")
     vector_output.parent.mkdir(parents=True, exist_ok=True)
     image_output.parent.mkdir(parents=True, exist_ok=True)
+    color_image_output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="oxford-basemap-") as temporary_directory:
         temporary_path = Path(temporary_directory)
         source_path, source_date = download_extract(temporary_path, source_archive)
         staged_vector = temporary_path / "oxford_osm.gpkg"
         staged_image = temporary_path / "oxford_basemap.png"
+        staged_color_image = temporary_path / "oxford_basemap_color.png"
         metadata_path = temporary_path / "oxford_basemap.json"
         layers, layer_names, bounds, image_extent = clip_layers(
             source_path, boundary_path, staged_vector
         )
-        render_basemap(layers, staged_image, image_extent)
+        render_basemap(layers, staged_image, image_extent, grayscale=True)
+        render_basemap(layers, staged_color_image, image_extent, grayscale=False)
         metadata_path.write_text(
             json.dumps(
                 {
@@ -258,6 +317,9 @@ def build_basemap(
                     "license": "Open Database License (ODbL) 1.0",
                     "attribution": "© OpenStreetMap contributors",
                     "layers": layer_names,
+                    "color_image": os.path.relpath(
+                        color_image_output, image_output.parent
+                    ),
                 },
                 indent=2,
             )
@@ -266,6 +328,7 @@ def build_basemap(
         )
         os.replace(staged_vector, vector_output)
         os.replace(staged_image, image_output)
+        os.replace(staged_color_image, color_image_output)
         os.replace(metadata_path, image_output.with_suffix(".json"))
 
 
@@ -293,15 +356,26 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "assets" / "oxford_basemap.png",
     )
+    parser.add_argument(
+        "--color-image-output",
+        type=Path,
+        default=None,
+        help="Path for the full-colour basemap PNG",
+    )
     args = parser.parse_args()
     build_basemap(
         args.boundaries,
         args.vector_output,
         args.image_output,
         args.source_archive,
+        args.color_image_output,
     )
     print(f"Saved clipped OSM vector layers to {args.vector_output}")
-    print(f"Saved raster basemap to {args.image_output}")
+    print(f"Saved grayscale raster basemap to {args.image_output}")
+    color_image_output = args.color_image_output or args.image_output.with_name(
+        f"{args.image_output.stem}_color{args.image_output.suffix}"
+    )
+    print(f"Saved full-colour raster basemap to {color_image_output}")
 
 
 if __name__ == "__main__":
