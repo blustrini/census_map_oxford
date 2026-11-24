@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +11,8 @@ import geopandas as gpd
 import pandas as pd
 import yaml
 from folium import LinearColormap
+
+from census.map_utils import add_basemap, load_basemap_bounds
 
 AGE_CODE_COLUMN = "Age (101 categories) Code"
 AREA_CODE_COLUMN = "Middle layer Super Output Areas Code"
@@ -227,17 +228,7 @@ def create_map(
     if oxford.empty:
         raise ValueError("No Oxford MSOA boundaries matched the age data")
 
-    with basemap_metadata_path.open(encoding="utf-8") as metadata_file:
-        basemap_metadata = json.load(metadata_file)
-    image_bounds = basemap_metadata.get("bounds")
-    if (
-        not isinstance(image_bounds, list)
-        or len(image_bounds) != 2
-        or any(not isinstance(corner, list) or len(corner) != 2 for corner in image_bounds)
-    ):
-        raise ValueError(f"Basemap metadata has invalid image bounds: {basemap_metadata_path}")
-    if not basemap_image_path.is_file():
-        raise ValueError(f"Basemap image does not exist: {basemap_image_path}")
+    image_bounds = load_basemap_bounds(basemap_metadata_path, basemap_image_path)
 
     minimum = int(oxford[DERIVED_COL_NAME].min())
     maximum = int(oxford[DERIVED_COL_NAME].max())
@@ -266,14 +257,7 @@ def create_map(
         tiles=None,
         control_scale=True,
     )
-    folium.raster_layers.ImageOverlay(
-        image=str(basemap_image_path),
-        bounds=image_bounds,
-        name="Local OpenStreetMap basemap",
-        interactive=False,
-        cross_origin=False,
-        zindex=1,
-    ).add_to(map_view)
+    add_basemap(map_view, basemap_image_path, image_bounds)
 
     age_str = _get_str(settings)
 
@@ -286,19 +270,6 @@ def create_map(
         f"{len(oxford)} MSOAs</div>"
     )
     map_view.get_root().html.add_child(title)
-    map_view.get_root().html.add_child(
-        folium.Element(
-            "<div style='position: fixed; bottom: 24px; left: 10px; z-index: 9999; "
-            "background: rgba(255,255,255,.9); padding: 4px 7px; "
-            "font: 11px/1.4 sans-serif;'>"
-            "Basemap data: &copy; "
-            "<a href='https://www.openstreetmap.org/copyright'>"
-            "OpenStreetMap contributors</a> ("
-            "<a href='https://opendatacommons.org/licenses/odbl/1-0/'>"
-            "ODbL 1.0</a>; locally rendered)</div>"
-        )
-    )
-
     folium.GeoJson(
         oxford.to_json(),
         name=f"Residents aged {age_str}",

@@ -43,6 +43,25 @@ The command checks that age data covers codes 0-100 for each Oxford MSOA and
 that every MSOA has one matching boundary. It stops with an error if the data
 and boundaries do not match rather than drawing an incomplete map.
 
+## Generate the foraging map
+
+Run the separate foraging-map entrypoint:
+
+```bash
+uv run census-foraging
+```
+
+This reads `data/oxford_foraging.csv` and writes
+`outputs/oxford_foraging_map.html`. Locations are shown as small circles,
+coloured by category; hover over a circle for its label and description, and
+use the layer control to toggle categories. A location outside the shared
+basemap bounds is omitted and reported (the source currently contains one such
+coordinate). Marker settings are loaded from `foraging_config.yaml`: adjust
+`dot_sizes` (radius in pixels) per category and `alpha` (shared marker opacity,
+from 0 to 1). Pass `--config` to use another YAML file. Input and output paths
+can be changed with `--foraging-data` and `--output`; the same `--basemap-image`
+and `--basemap-metadata` options are available as for the age map.
+
 ## Local basemap
 
 The local background assets are in `assets/oxford_basemap.png` and

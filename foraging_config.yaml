@@ -1,0 +1,12 @@
+# Shared opacity for marker outlines and fills (0 is invisible, 1 is opaque).
+alpha: 0.5
+
+# CircleMarker radius in pixels, configured separately for each CSV layer.
+dot_sizes:
+  Apples and Pears: 25
+  Blackberries: 50
+  Cherries, plums, damsons: 10
+  Sloes, blackthorn and hawthorn: 5
+  Elder: 20
+  Additions in 2017: 5
+  Uncategorised: 5
