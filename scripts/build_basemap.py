@@ -266,7 +266,14 @@ def render_basemap(
     axis.set_aspect("equal")
     axis.axis("off")
     figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    figure.savefig(image_path, dpi=RASTER_DPI, facecolor=figure.get_facecolor())
+    # This PNG is immediately quantized and re-encoded below; skip compression
+    # here without changing the pixels or the final optimized PNG.
+    figure.savefig(
+        image_path,
+        dpi=RASTER_DPI,
+        facecolor=figure.get_facecolor(),
+        pil_kwargs={"compress_level": 0},
+    )
     plt.close(figure)
     optimized_image_path = image_path.with_name(f"{image_path.stem}_optimized.png")
     with Image.open(image_path) as rendered_image:

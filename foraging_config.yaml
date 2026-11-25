@@ -1,9 +1,59 @@
 # Illustrative placeholders only. Replace these with age-bracket survey results.
 # Scores are relative foraging-knowledge values per category from 0 to 1.
 # Older age brackets currently score higher across all categories by design.
-alpha: 0.8
+# Gentle washes: overlapping locations gradually build up colour.
+alpha: 0.45
 # Distance from a marked location where its colour reveal fades out (metres).
-reveal_radius_meters: 900
+# alpha and reveal_radius_meters apply only to blend mode.
+reveal_radius_meters: 1400
+
+# Visual controls for --mode blend. These override the legacy settings above.
+# Edit, save, rerun the command, then refresh the output HTML.
+blend:
+  # Distance from each location to the transparent edge, in metres (1–10000).
+  # Knowledge changes opacity, not radius, in blend mode.
+  radius_meters: 1000
+  # Maximum centre opacity, multiplied by the knowledge score (0–1).
+  # Overlapping locations build up the reveal strength.
+  opacity: 0.45
+  # 0.1–20: higher fades faster; 1 is linear; below 1 gives fuller patches.
+  fade_steepness: 2
+  # Fraction of radius kept at full configured opacity before fading (0–0.99).
+  solid_core: 0
+  # Colour adjustments to the revealed map only (0–3, 1 = unchanged).
+  # Saturation: 0 = grayscale, above 1 = more vivid colours.
+  saturation: 1
+  # Brightness: below 1 = darker, above 1 = lighter (0 = black).
+  brightness: 1
+  # Contrast: below 1 = gentler, above 1 = stronger (0 = flat grey).
+  contrast: 1
+
+# Visual controls for --mode circles. Edit, save, then rerun the command and
+# refresh the generated HTML in your browser. All settings here are optional.
+circles:
+  # Radius = minimum + score × (maximum - minimum), in metres (0–10000).
+  # A score of zero hides the circle. Equal radii give every visible circle
+  # the same size, regardless of knowledge score.
+  min_radius_meters: 280
+  max_radius_meters: 840
+  # 0 = invisible, 1 = opaque at the centre. Overlaps build up colour.
+  opacity: 0.45
+  # 0.1–20: 1 = linear fade; higher = faster fading / softer, smaller-looking
+  # washes; lower = fuller discs with a more pronounced outer edge.
+  fade_steepness: 3
+  # Fraction of the radius kept at full opacity before fading (0–0.99).
+  # For example, 0.25 gives a solid inner quarter; 0 fades from the centre.
+  solid_core: 0
+  # Use six-digit hex colours from a colour picker. Keep the quotes around #.
+  # Omitted categories retain their default colours; category names must match.
+  category_colors:
+    Apples and Pears: "#8a9b68"
+    Blackberries: "#80718c"
+    Cherries, plums, damsons: "#b18086"
+    Sloes, blackthorn and hawthorn: "#708b91"
+    Elder: "#b5a568"
+    Additions in 2017: "#719381"
+    Uncategorised: "#969487"
 
 knowledge_scores:
   "18-34":

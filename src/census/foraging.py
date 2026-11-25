@@ -1,18 +1,26 @@
+"""Foraging colour-reveal map: settings, location data, rendering, and command."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from html import escape
 from pathlib import Path
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 import folium
+from folium.raster_layers import ImageOverlay
 import pandas as pd
-import yaml
 
-from census.map_utils import add_basemap, load_basemap_bounds
+from census.cli import PROJECT_ROOT, add_basemap_arguments
+from census.config import load_config
+from census.foraging_blend import BLEND_GRADIENT_SCRIPT, BlendSettings, load_blend_settings
+from census.foraging_circles import (
+    CIRCLE_DRAW_SCRIPT, CircleSettings, circle_legend, load_circle_settings,
+)
+from census.map_utils import add_basemap, get_map_figure, load_basemap_bounds
 
 LAYER_COLUMN = "layer"
 LATITUDE_COLUMN = "latitude"
@@ -20,17 +28,18 @@ LONGITUDE_COLUMN = "longitude"
 REQUIRED_COLUMNS = {LAYER_COLUMN, LATITUDE_COLUMN, LONGITUDE_COLUMN}
 
 LAYER_COLORS = {
-    "Apples and Pears": "#e41a1c",
-    "Blackberries": "#377eb8",
-    "Cherries, plums, damsons": "#4daf4a",
-    "Sloes, blackthorn and hawthorn": "#984ea3",
-    "Elder": "#ff7f00",
-    "Additions in 2017": "#a65628",
-    "Uncategorised": "#666666",
+    "Apples and Pears": "#8a9b68",
+    "Blackberries": "#80718c",
+    "Cherries, plums, damsons": "#b18086",
+    "Sloes, blackthorn and hawthorn": "#708b91",
+    "Elder": "#b5a568",
+    "Additions in 2017": "#719381",
+    "Uncategorised": "#969487",
 }
 FORAGING_SETTING_KEYS = {"alpha", "reveal_radius_meters", "knowledge_scores"}
-DEFAULT_ALPHA = 0.75
-DEFAULT_REVEAL_RADIUS_METERS = 900
+DEFAULT_ALPHA = 0.45
+DEFAULT_REVEAL_RADIUS_METERS = 1400
+RENDER_MODES = ("blend", "circles")
 
 
 @dataclass(frozen=True)
@@ -38,29 +47,13 @@ class ForagingMapSettings:
     alpha: float
     reveal_radius_meters: int
     knowledge_scores: Mapping[str, Mapping[str, float]]
+    circles: CircleSettings = field(default_factory=CircleSettings)
+    blend: BlendSettings | None = None
 
 
 def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
     """Load and validate age/category knowledge scores and reveal styling."""
-    try:
-        with config_path.open(encoding="utf-8") as config_file:
-            config = yaml.safe_load(config_file)
-    except yaml.YAMLError as error:
-        raise ValueError(f"Invalid YAML in {config_path}: {error}") from error
-
-    if not isinstance(config, dict):
-        raise ValueError("Foraging configuration must be a YAML mapping")
-    if not all(isinstance(key, str) for key in config):
-        raise ValueError("Foraging configuration keys must be strings")
-    missing = FORAGING_SETTING_KEYS - config.keys()
-    unexpected = config.keys() - FORAGING_SETTING_KEYS
-    if missing or unexpected:
-        details = []
-        if missing:
-            details.append(f"missing settings: {sorted(missing)}")
-        if unexpected:
-            details.append(f"unknown settings: {sorted(unexpected, key=str)}")
-        raise ValueError("Invalid foraging configuration (" + "; ".join(details) + ")")
+    config = load_config(config_path, FORAGING_SETTING_KEYS, {"circles", "blend"})
 
     alpha = config["alpha"]
     if (
@@ -127,6 +120,8 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
         alpha=float(alpha),
         reveal_radius_meters=reveal_radius_meters,
         knowledge_scores=validated_scores,
+        circles=load_circle_settings(config.get("circles", {}), LAYER_COLORS),
+        blend=load_blend_settings(config.get("blend", {}), alpha, reveal_radius_meters),
     )
 
 
@@ -164,13 +159,17 @@ def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
 
 def _add_reveal_controls(
     map_view: folium.Map,
-    color_overlay: folium.raster_layers.ImageOverlay,
+    color_overlay: ImageOverlay | None,
     image_bounds: list[list[float]],
     locations_by_category: Mapping[str, list[list[float]]],
     settings: ForagingMapSettings,
     initial_age: str,
+    mode: str = "blend",
 ) -> None:
     age_brackets = list(settings.knowledge_scores)
+    blend = settings.blend or BlendSettings(
+        opacity=settings.alpha, radius_meters=settings.reveal_radius_meters,
+    )
     categories = sorted(LAYER_COLORS)
     first_option = "<option value='__all__'>All categories</option>"
     category_options = first_option + "".join(
@@ -182,22 +181,30 @@ def _add_reveal_controls(
         f"<option value='{escape(age, quote=True)}'>{escape(age)}</option>"
         for age in age_brackets
     )
-    map_view.get_root().html.add_child(
+    get_map_figure(map_view).html.add_child(
         folium.Element(
+            "<style>"
+            ".leaflet-container{background:#eeede6;}"
+            ".leaflet-image-layer{filter:sepia(.12) saturate(.65) "
+            "brightness(1.04) contrast(.88);}"
+            "#foraging-age,#foraging-category{border:1px solid #d5d8ce;"
+            "border-radius:5px;background:#fafbf7;color:#39473c;padding:4px;}"
+            "</style>"
             "<div style='position:fixed;top:16px;right:16px;z-index:9999;"
-            "background:rgba(255,255,255,.96);padding:10px 12px;border-radius:4px;"
-            "box-shadow:0 1px 5px #888;font:13px/1.6 sans-serif;'>"
+            "background:rgba(250,251,247,.95);padding:12px 14px;border-radius:8px;"
+            "color:#39473c;box-shadow:0 2px 12px #34433420;font:13px/1.6 sans-serif;'>"
             "<label>Age bracket<br><select id='foraging-age' style='width:190px;'>"
             f"{age_options}</select></label><br>"
             "<label>Plant category<br><select id='foraging-category' "
             f"style='width:190px;'>{category_options}</select></label></div>"
         )
     )
-    map_view.get_root().html.add_child(
+    get_map_figure(map_view).html.add_child(
         folium.Element(
             "<div style='position:fixed;bottom:24px;right:10px;z-index:9999;"
-            "background:rgba(255,255,255,.95);padding:8px 10px;border-radius:4px;"
-            "box-shadow:0 1px 5px #888;font:12px/1.4 sans-serif;width:230px;'>"
+            "background:rgba(250,251,247,.95);padding:12px 14px;border-radius:8px;"
+            "color:#39473c;box-shadow:0 2px 12px #34433420;font:12px/1.5 sans-serif;width:230px;'>"
+             + (circle_legend({**LAYER_COLORS, **settings.circles.category_colors}, settings.circles) if mode == "circles" else
             "<strong>Colour reveal</strong>"
             "<div style='height:14px;margin:6px 0 2px;background:linear-gradient("
             "to right,#bdbdbd 0%,#f2f2f2 45%,#dce9d3 55%,#438e55 100%);'></div>"
@@ -205,7 +212,8 @@ def _add_reveal_controls(
             "<span>Grayscale</span><span>Full colour</span></div>"
             "<div style='color:#555;margin-top:4px;'>Colour appears near foraging "
             "locations and fades with distance.</div>"
-            "<div style='color:#555;'>Scores are illustrative placeholders.</div></div>"
+            "<div style='color:#555;'>Scores are illustrative placeholders.</div>")
+            + "</div>"
         )
     )
 
@@ -224,10 +232,12 @@ def _add_reveal_controls(
     const locationsByCategory = {locations_json};
     const knowledgeScores = {scores_json};
     const foragingMap = {map_view.get_name()};
-    const colorOverlay = {color_overlay.get_name()};
+    const colorOverlay = {color_overlay.get_name() if color_overlay else 'null'};
+    const renderMode = {json.dumps(mode)};
+    const categoryColors = {json.dumps({**LAYER_COLORS, **settings.circles.category_colors})};
+    const circleStyle = {json.dumps(asdict(settings.circles))};
+    const blendStyle = {json.dumps(asdict(blend))};
     const imageBounds = {json.dumps(image_bounds)};
-    const revealRadiusMeters = {settings.reveal_radius_meters};
-    const revealAlpha = {settings.alpha};
     const foragingAgeSelect = document.getElementById('foraging-age');
     const foragingCategorySelect = document.getElementById('foraging-category');
     foragingAgeSelect.value = {json.dumps(initial_age)};
@@ -239,8 +249,9 @@ def _add_reveal_controls(
     foragingMap.getPanes().overlayPane.appendChild(revealCanvas);
 
     function drawReveal() {{
-        const colorImage = colorOverlay._image;
-        if (!colorImage || !colorImage.complete || !colorImage.naturalWidth) return;
+        const colorImage = colorOverlay && colorOverlay._image;
+        if (renderMode === 'blend' &&
+            (!colorImage || !colorImage.complete || !colorImage.naturalWidth)) return;
         const size = foragingMap.getSize();
         const pixelRatio = window.devicePixelRatio || 1;
         for (const canvas of [revealCanvas, revealMask]) {{
@@ -258,9 +269,21 @@ def _add_reveal_controls(
         ctx.clearRect(0, 0, size.x, size.y);
         mask.clearRect(0, 0, size.x, size.y);
 
+        const age = foragingAgeSelect.value;
+        const category = foragingCategorySelect.value;
+        const selectedCategories = category === '__all__'
+            ? Object.keys(locationsByCategory)
+            : [category];
+        if (renderMode === 'circles') {{
+            {CIRCLE_DRAW_SCRIPT}
+            return;
+        }}
+
         const [[south, west], [north, east]] = imageBounds;
         const upperLeft = foragingMap.latLngToLayerPoint([north, west]);
         const lowerRight = foragingMap.latLngToLayerPoint([south, east]);
+        // Bring back restrained natural colour, rather than saturated map ink.
+        ctx.filter = `saturate(${{blendStyle.saturation}}) contrast(${{blendStyle.contrast}}) brightness(${{blendStyle.brightness}})`;
         ctx.drawImage(
             colorImage,
             upperLeft.x - origin.x,
@@ -268,12 +291,8 @@ def _add_reveal_controls(
             lowerRight.x - upperLeft.x,
             lowerRight.y - upperLeft.y
         );
+        ctx.filter = 'none';
 
-        const age = foragingAgeSelect.value;
-        const category = foragingCategorySelect.value;
-        const selectedCategories = category === '__all__'
-            ? Object.keys(locationsByCategory)
-            : [category];
         const points = selectedCategories.flatMap((layer) =>
             locationsByCategory[layer].map(([latitude, longitude]) => [
                 latitude,
@@ -287,13 +306,10 @@ def _add_reveal_controls(
             const y = point.y - origin.y;
             const metresPerPixel = Math.cos(latitude * Math.PI / 180)
                 * 2 * Math.PI * 6378137 / (256 * Math.pow(2, foragingMap.getZoom()));
-            const radius = revealRadiusMeters / metresPerPixel;
-            const opacity = Math.min(1, revealAlpha * score);
+            const radius = blendStyle.radius_meters / metresPerPixel;
+            const opacity = blendStyle.opacity * score;
             if (opacity <= 0 || radius <= 0) continue;
-            const gradient = mask.createRadialGradient(x, y, 0, x, y, radius);
-            gradient.addColorStop(0, 'rgba(255,255,255,' + opacity + ')');
-            gradient.addColorStop(0.65, 'rgba(255,255,255,' + opacity * 0.55 + ')');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            {BLEND_GRADIENT_SCRIPT}
             mask.fillStyle = gradient;
             mask.fillRect(x - radius, y - radius, radius * 2, radius * 2);
         }}
@@ -316,7 +332,7 @@ def _add_reveal_controls(
         drawReveal();
         revealCanvas.style.opacity = '1';
     }});
-    if (colorOverlay._image && colorOverlay._image.complete) {{
+    if (!colorOverlay || (colorOverlay._image && colorOverlay._image.complete)) {{
         updateReveal();
     }} else {{
         colorOverlay.once('load', updateReveal);
@@ -327,7 +343,7 @@ def _add_reveal_controls(
     foragingCategorySelect.addEventListener('change', updateReveal);
     }});
     """
-    map_view.get_root().script.add_child(folium.Element(script))
+    get_map_figure(map_view).script.add_child(folium.Element(script))
 
 
 def _load_color_basemap_path(
@@ -361,8 +377,11 @@ def create_foraging_map(
     basemap_metadata_path: Path,
     settings: ForagingMapSettings | None = None,
     color_basemap_image_path: Path | None = None,
+    mode: str = "blend",
 ) -> tuple[int, int]:
-    """Reveal colour around configured foraging locations; return plotted/excluded counts."""
+    """Render a blend or category circles; return plotted/excluded counts."""
+    if mode not in RENDER_MODES:
+        raise ValueError(f"Unknown foraging mode {mode!r}; choose from {RENDER_MODES}")
     if settings is None:
         settings = ForagingMapSettings(
             alpha=DEFAULT_ALPHA,
@@ -377,7 +396,7 @@ def create_foraging_map(
         basemap_metadata_path,
         basemap_image_path,
         color_basemap_image_path,
-    )
+    ) if mode == "blend" else None
     (min_lat, min_lon), (max_lat, max_lon) = image_bounds
 
     in_bounds = locations[
@@ -395,8 +414,14 @@ def create_foraging_map(
         tiles=None,
         control_scale=True,
     )
-    add_basemap(map_view, basemap_image_path, image_bounds)
-    color_overlay = folium.raster_layers.ImageOverlay(
+    add_basemap(
+        map_view, basemap_image_path, image_bounds, class_name="foraging-basemap"
+    )
+    # Lift the grey paper towards white without filtering the colourful overlays.
+    get_map_figure(map_view).header.add_child(
+        folium.Element("<style>.foraging-basemap { filter: brightness(1.12); }</style>")
+    )
+    color_overlay = ImageOverlay(
         image=str(color_image_path),
         bounds=image_bounds,
         name="Colour basemap revealed near foraging locations",
@@ -404,7 +429,9 @@ def create_foraging_map(
         cross_origin=False,
         opacity=0,
         zIndex=2,
-    ).add_to(map_view)
+    ) if color_image_path is not None else None
+    if color_overlay is not None:
+        color_overlay.add_to(map_view)
 
     locations_by_category: dict[str, list[list[float]]] = {}
     for category in LAYER_COLORS:
@@ -421,15 +448,18 @@ def create_foraging_map(
         image_bounds,
         locations_by_category,
         settings,
-        age_brackets[-1],
+        age_brackets[0],
+        mode,
     )
     title = folium.Element(
         "<div style='position: fixed; top: 16px; left: 60px; z-index: 9999; "
-        "background: white; padding: 10px 14px; border-radius: 4px; "
-        "box-shadow: 0 1px 5px #888; font: 16px/1.4 sans-serif;'>"
-        f"<strong>Oxford comes alive</strong><br>{len(in_bounds)} foraging locations</div>"
+        "background: rgba(250,251,247,.95); color:#39473c; padding: 12px 16px; border-radius: 8px; "
+        "box-shadow: 0 2px 12px #34433420; font: 16px/1.5 sans-serif;'>"
+        "<strong>Oxford comes alive</strong><br>"
+        "<span style='font-size:12px;'>A more familiar city, a richer landscape</span><br>"
+        f"<span style='font-size:11px;color:#687367;'>{len(in_bounds)} foraging locations</span></div>"
     )
-    map_view.get_root().html.add_child(title)
+    get_map_figure(map_view).html.add_child(title)
     map_view.fit_bounds(image_bounds)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -438,7 +468,8 @@ def create_foraging_map(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    project_root = Path(__file__).resolve().parents[2]
+    """Run the foraging-map command with optional explicit command arguments."""
+    project_root = PROJECT_ROOT
     parser = argparse.ArgumentParser(
         description="Map Oxford foraging locations on the local Oxford basemap."
     )
@@ -454,17 +485,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=project_root / "data" / "oxford_foraging.csv",
         help="Path to the foraging locations CSV",
     )
+    add_basemap_arguments(parser)
     parser.add_argument(
-        "--basemap-image",
-        type=Path,
-        default=project_root / "assets" / "oxford_basemap.png",
-        help="Path to the locally rendered basemap PNG",
-    )
-    parser.add_argument(
-        "--basemap-metadata",
-        type=Path,
-        default=project_root / "assets" / "oxford_basemap.json",
-        help="Path to the basemap JSON containing geographic image bounds",
+        "--mode",
+        choices=RENDER_MODES,
+        default="blend",
+        help="blend: reveal the colour basemap (default); circles: category-coloured "
+        "fading circles with knowledge-scaled radii",
     )
     parser.add_argument(
         "--color-basemap-image",
@@ -488,6 +515,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             args.basemap_metadata,
             settings,
             args.color_basemap_image,
+            mode=args.mode,
         )
     except (OSError, ValueError) as error:
         parser.error(str(error))
