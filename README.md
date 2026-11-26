@@ -86,11 +86,16 @@ more of the city to life. Knowledge scores are left independent of styling.
 Reveal settings are loaded from `foraging_config.yaml`. `knowledge_scores`
 contains a numeric value from 1 to 7 for every age-bracket/category pair. Scores
 are normalized on loading using `(score - 1) / 6`: 1 becomes 0 (hidden), 4
-becomes 0.5, and 7 becomes 1. Fractional scores are allowed. `alpha` sets the
+becomes 0.5, and 7 becomes 1. Fractional scores are allowed. Each age bracket
+also has a reserved `global` score on the same scale. Blend mode uses this
+score for every location, including uncategorised and unconfigured layers;
+category scores do not affect blend reveals. Older configs without `global`
+default to maximum global knowledge. Circles continue to use category scores
+and hide locations without corresponding knowledge. `alpha` sets the
 maximum reveal strength, and `reveal_radius_meters` controls how far colour
 spreads from each location. The checked-in scores are illustrative
-placeholders, deliberately set so older brackets score higher across all
-categories. They are not survey findings and should be replaced with collected
+placeholders; global scores default to 4 in every bracket. They are not survey
+findings and should be replaced with collected
 results. Pass `--config` to use another YAML file. Input and output paths can
 be changed with `--foraging-data`, `--output`, and `--color-basemap-image`;
 the grayscale image and metadata options are shared with the age map.
@@ -102,8 +107,10 @@ hard-coded Python list. To rename, add or remove a layer, update its entry in
 every age bracket and use the same name in the CSV's `layer` column. Update
 any matching `circles.category_colors` entry too; colours are optional and
 omitted entries receive a default palette colour. No Python changes are needed.
-All age brackets must contain the same layers; CSV layers missing from the
-configuration produce an error. Configured layers with no locations are allowed.
+All age brackets must contain the same score keys. CSV layers missing from the
+configuration are included in blend mode and omitted in circles mode.
+`global` is not a layer and is never shown in category controls or legends.
+Configured layers with no locations are allowed.
 
 The configuration is prepared for `edible apples`, `edible stone fruits`,
 `blackberries`, `elder trees`, `nettles`, `wild garlic`, `edible mushrooms`, and

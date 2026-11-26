@@ -56,7 +56,7 @@ class ForagingMapSettings:
 
     @property
     def categories(self) -> list[str]:
-        return list(next(iter(self.knowledge_scores.values())))
+        return [name for name in next(iter(self.knowledge_scores.values())) if name != "global"]
 
     @property
     def colors(self) -> dict[str, str]:
@@ -147,7 +147,9 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
         reveal_radius_meters=reveal_radius_meters,
         knowledge_scores=validated_scores,
         circles=load_circle_settings(
-            config.get("circles", {}), category_colors(list(next(iter(validated_scores.values())))),
+            config.get("circles", {}), category_colors([
+                name for name in next(iter(validated_scores.values())) if name != "global"
+            ]),
         ),
         blend=load_blend_settings(config.get("blend", {}), alpha, reveal_radius_meters),
     )
@@ -203,7 +205,7 @@ def _add_reveal_controls(
     blend = settings.blend or BlendSettings(
         opacity=settings.alpha, radius_meters=settings.reveal_radius_meters,
     )
-    categories = sorted(settings.categories)
+    categories = sorted(locations_by_category)
     first_option = "<option value='__all__'>All categories</option>"
     category_options = first_option + "".join(
         f"<option value='{escape(category, quote=True)}'>"
@@ -330,7 +332,7 @@ def _add_reveal_controls(
             locationsByCategory[layer].map(([latitude, longitude]) => [
                 latitude,
                 longitude,
-                knowledgeScores[age][layer]
+                knowledgeScores[age].global === undefined ? 1 : knowledgeScores[age].global
             ])
         );
         for (const [latitude, longitude, score] of points) {{
@@ -415,15 +417,16 @@ def create_foraging_map(
     """Render a blend or category circles; return plotted/excluded counts."""
     if mode not in RENDER_MODES:
         raise ValueError(f"Unknown foraging mode {mode!r}; choose from {RENDER_MODES}")
-    locations = load_foraging_locations(
-        foraging_data_path, settings.categories if settings is not None else None,
-    )
+    locations = load_foraging_locations(foraging_data_path)
     if settings is None:
         settings = ForagingMapSettings(
             alpha=DEFAULT_ALPHA,
             reveal_radius_meters=DEFAULT_REVEAL_RADIUS_METERS,
             knowledge_scores={
-                "All ages": {layer: 1.0 for layer in locations[LAYER_COLUMN].unique()}
+                "All ages": {
+                    **{layer: 1.0 for layer in locations[LAYER_COLUMN].unique()},
+                    "global": 1.0,
+                }
             },
         )
     image_bounds = load_basemap_bounds(basemap_metadata_path, basemap_image_path)
@@ -433,6 +436,9 @@ def create_foraging_map(
         color_basemap_image_path,
     ) if mode == "blend" else None
     (min_lat, min_lon), (max_lat, max_lon) = image_bounds
+
+    if mode == "circles":
+        locations = locations[locations[LAYER_COLUMN].isin(settings.categories)]
 
     in_bounds = locations[
         locations[LATITUDE_COLUMN].between(min_lat, max_lat)
@@ -469,7 +475,11 @@ def create_foraging_map(
         color_overlay.add_to(map_view)
 
     locations_by_category: dict[str, list[list[float]]] = {}
-    for category in settings.categories:
+    categories = (
+        list(dict.fromkeys([*settings.categories, *in_bounds[LAYER_COLUMN].unique()]))
+        if mode == "blend" else settings.categories
+    )
+    for category in categories:
         category_locations = in_bounds.loc[in_bounds[LAYER_COLUMN] == category]
         locations_by_category[category] = [
             [float(location[LATITUDE_COLUMN]), float(location[LONGITUDE_COLUMN])]

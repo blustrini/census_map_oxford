@@ -1,7 +1,7 @@
-# Illustrative placeholders only. Replace these with age-bracket survey results.
+# Age-bracket foraging-confidence scores.
 # Scores are foraging-confidence values per category from 1 to 7 (inclusive).
 # Parsed as (score - 1) / 6 internally: 1 = hidden, 7 = maximum knowledge.
-# Older age brackets currently score higher across all categories by design.
+# Global scores are independent of category scores.
 # Gentle washes: overlapping locations gradually build up colour.
 alpha: 0.45
 # Distance from a marked location where its colour reveal fades out (metres).
@@ -12,7 +12,7 @@ reveal_radius_meters: 1400
 # Edit, save, rerun the command, then refresh the output HTML.
 blend:
   # Maximum distance to the transparent edge, in metres (1–10000).
-  # Radius is multiplied by the knowledge score; a zero score hides the reveal.
+  # Radius is multiplied by normalized global knowledge; zero hides the reveal.
   radius_meters: 1000
   # Centre opacity (0–1), independent of the knowledge score.
   # Overlapping locations build up the reveal strength.
@@ -55,44 +55,78 @@ circles:
     Nettles: "#89b9dc"
     Wild Garlic: "#86d5b0"
     Edible Mushrooms: "#c5a580"
-    Uncategorised: "#ccc6b8"
 
 # Layer names are defined here, not in Python. Use the same names for every
 # age bracket and in the CSV's layer column. Colours above are optional.
+# Reserved global score: blend mode uses this for every location, regardless
+# of category. Circles use only category scores. All scores use the 1–7 scale.
 knowledge_scores:
-  "18-34":
-    Edible Apples: 1.72
-    Edible Stone Fruits: 1.60
-    Blackberries: 2.08
-    Elder Trees: 1.84
-    Nettles: 1.60
-    Wild Garlic: 1.78
-    Edible Mushrooms: 1.60
-    Uncategorised: 1.78
-  "35-54":
-    Edible Apples: 2.80
-    Edible Stone Fruits: 3.04
-    Blackberries: 2.92
-    Elder Trees: 3.10
-    Nettles: 3.28
-    Wild Garlic: 3.40
-    Edible Mushrooms: 2.80
-    Uncategorised: 2.92
-  "55+":
-    Edible Apples: 6.16
-    Edible Stone Fruits: 5.80
-    Blackberries: 6.04
-    Elder Trees: 6.28
-    Nettles: 6.16
-    Wild Garlic: 5.20
-    Edible Mushrooms: 5.80
-    Uncategorised: 6.10
-  "my age range":
-    Edible Apples: 6.16
-    Edible Stone Fruits: 5.80
-    Blackberries: 6.04
-    Elder Trees: 6.28
-    Nettles: 6.16
-    Wild Garlic: 5.20
-    Edible Mushrooms: 5.80
-    Uncategorised: 6.10
+  "18-24":
+    global: 3.555555556
+    Blackberries: 6
+    Edible Apples: 5
+    Edible Stone Fruits: 1
+    Elder Trees: 2
+    Nettles: 6
+    Wild Garlic: 4
+    Edible Mushrooms: 1
+
+  "25-34":
+    global: 3.666666667
+    Blackberries: 6
+    Edible Apples: 5
+    Edible Stone Fruits: 3
+    Elder Trees: 1
+    Nettles: 7
+    Wild Garlic: 3
+    Edible Mushrooms: 1
+
+  "35-44":
+    global: 5.611111111
+    Blackberries: 7
+    Edible Apples: 7
+    Edible Stone Fruits: 5.5
+    Elder Trees: 6
+    Nettles: 7
+    Wild Garlic: 5.5
+    Edible Mushrooms: 1
+
+  "45-54":
+    global: 5.777777778
+    Blackberries: 7
+    Edible Apples: 7
+    Edible Stone Fruits: 5
+    Elder Trees: 6
+    Nettles: 7
+    Wild Garlic: 5
+    Edible Mushrooms: 2
+
+  "55-64":
+    global: 5.944444444
+    Blackberries: 7
+    Edible Apples: 7
+    Edible Stone Fruits: 6
+    Elder Trees: 7
+    Nettles: 7
+    Wild Garlic: 6.5
+    Edible Mushrooms: 2
+
+  "65-74":
+    global: 5.222222222
+    Blackberries: 7
+    Edible Apples: 5
+    Edible Stone Fruits: 5
+    Elder Trees: 6.5
+    Nettles: 7
+    Wild Garlic: 5.5
+    Edible Mushrooms: 2.5
+
+  "75+":
+    global: 6.222222222
+    Blackberries: 7
+    Edible Apples: 7
+    Edible Stone Fruits: 6
+    Elder Trees: 6
+    Nettles: 7
+    Wild Garlic: 7
+    Edible Mushrooms: 4.5

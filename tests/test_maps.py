@@ -289,6 +289,44 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
             self.assertIn("new plant", message)
             self.assertIn("update every age bracket", message)
 
+    def test_global_blend_includes_unconfigured_locations(self):
+        config = self.root / "global.yaml"
+        config.write_text(json.dumps({
+            "alpha": 0.5, "reveal_radius_meters": 900,
+            "knowledge_scores": {"All": {"global": 4, "plant": 1}},
+        }))
+        settings = foraging.load_foraging_settings(config)
+        self.assertEqual(settings.categories, ["plant"])
+        self.assertNotIn("global", settings.colors)
+        self.assertEqual(settings.knowledge_scores["All"]["global"], 0.5)
+        locations = self.root / "global.csv"
+        pd.DataFrame({
+            "layer": ["plant", "Uncategorised", "unknown"],
+            "latitude": [51.75] * 3, "longitude": [-1.25] * 3,
+        }).to_csv(locations, index=False)
+        for mode, count in (("blend", 3), ("circles", 1)):
+            with self.subTest(mode=mode):
+                output = self.root / f"global-{mode}.html"
+                self.assertEqual(foraging.create_foraging_map(
+                    locations, output, self.image, self.metadata, settings, mode=mode,
+                ), (count, 0))
+                html = output.read_text()
+                self.assertNotIn("<option value='global'>", html)
+                if mode == "blend":
+                    self.assertIn('"Uncategorised":[[51.75,-1.25]]', html)
+                    self.assertIn('"unknown":[[51.75,-1.25]]', html)
+
+    def test_invalid_global_scores_are_rejected(self):
+        config = self.root / "invalid-global.yaml"
+        for score in (0, 8, True, "4", None):
+            with self.subTest(score=score):
+                config.write_text(json.dumps({
+                    "alpha": 0.5, "reveal_radius_meters": 900,
+                    "knowledge_scores": {"All": {"global": score, "plant": 4}},
+                }))
+                with self.assertRaisesRegex(ValueError, "between 1 and 7"):
+                    foraging.load_foraging_settings(config)
+
     def test_stale_palette_entry_explains_how_to_fix_it(self):
         config = self.root / "stale-colour.yaml"
         config.write_text(json.dumps({

@@ -14,6 +14,40 @@ from census.foraging_blend import BLEND_GRADIENT_SCRIPT, load_blend_settings
 
 
 class BlendTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node.js required")
+    def test_all_blend_points_use_global_score(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.yaml"
+            path.write_text(json.dumps({
+                "alpha": 0.4, "reveal_radius_meters": 1000,
+                "knowledge_scores": {"All": {"global": 4, "Elder": 1}},
+            }))
+            settings = load_foraging_settings(path)
+        map_view = folium.Map()
+        _add_reveal_controls(
+            map_view, None, [[0, 0], [1, 1]],
+            {"Elder": [[0, 0]], "Uncategorised": [[0.5, 0.5]]}, settings, "All",
+        )
+        script = map_view.get_root().script.render()
+        points_script = script[script.index("        const points = selectedCategories.flatMap"):
+                               script.index("        for (const [latitude, longitude, score]")]
+        harness = """
+const assert = require('assert');
+const age = 'All';
+const knowledgeScores = {All: {global: 0.5, Elder: 0}};
+const locationsByCategory = {Elder: [[0, 0]], Uncategorised: [[0.5, 0.5]]};
+const selectedCategories = Object.keys(locationsByCategory);
+"""
+        subprocess.run(["node", "-e", harness + points_script + """
+assert.deepStrictEqual(points, [[0, 0, 0.5], [0.5, 0.5, 0.5]]);
+"""], check=True)
+        for score in (0, 1):
+            subprocess.run([
+                "node", "-e",
+                harness.replace("global: 0.5", f"global: {score}") + points_script
+                + f"assert(points.every(point => point[2] === {score}));",
+            ], check=True)
+
     def test_legacy_fallbacks_and_overrides(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.yaml"
