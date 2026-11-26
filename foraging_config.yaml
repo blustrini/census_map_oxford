@@ -47,51 +47,51 @@ circles:
   # Use six-digit hex colours from a colour picker. Keep the quotes around #.
   # Omitted categories retain their default colours; category names must match.
   category_colors:
-    edible apples: "#b5db80"
-    edible stone fruits: "#e58a9c"
-    blackberries: "#c28bda"
-    elder trees: "#ead28a"
-    nettles: "#89b9dc"
-    wild garlic: "#86d5b0"
-    edible mushrooms: "#c5a580"
-    uncategorised: "#ccc6b8"
+    Edible Apples: "#b5db80"
+    Edible Stone Fruits: "#e58a9c"
+    Blackberries: "#c28bda"
+    Elder Trees: "#ead28a"
+    Nettles: "#89b9dc"
+    Wild Garlic: "#86d5b0"
+    Edible Mushrooms: "#c5a580"
+    Uncategorised: "#ccc6b8"
 
 # Layer names are defined here, not in Python. Use the same names for every
 # age bracket and in the CSV's layer column. Colours above are optional.
 knowledge_scores:
   "18-34":
-    edible apples: 0.12
-    edible stone fruits: 0.10
-    blackberries: 0.18
-    elder trees: 0.14
-    nettles: 0.10
-    wild garlic: 0.13
-    edible mushrooms: 0.10
-    uncategorised: 0.13
+    Edible Apples: 0.12
+    Edible Stone Fruits: 0.10
+    Blackberries: 0.18
+    Elder Trees: 0.14
+    Nettles: 0.10
+    Wild Garlic: 0.13
+    Edible Mushrooms: 0.10
+    Uncategorised: 0.13
   "35-54":
-    edible apples: 0.30
-    edible stone fruits: 0.34
-    blackberries: 0.32
-    elder trees: 0.35
-    nettles: 0.38
-    wild garlic: 0.40
-    edible mushrooms: 0.30
-    uncategorised: 0.32
+    Edible Apples: 0.30
+    Edible Stone Fruits: 0.34
+    Blackberries: 0.32
+    Elder Trees: 0.35
+    Nettles: 0.38
+    Wild Garlic: 0.40
+    Edible Mushrooms: 0.30
+    Uncategorised: 0.32
   "55+":
-    edible apples: 0.86
-    edible stone fruits: 0.80
-    blackberries: 0.84
-    elder trees: 0.88
-    nettles: 0.86
-    wild garlic: 0.70
-    edible mushrooms: 0.80
-    uncategorised: 0.85
+    Edible Apples: 0.86
+    Edible Stone Fruits: 0.80
+    Blackberries: 0.84
+    Elder Trees: 0.88
+    Nettles: 0.86
+    Wild Garlic: 0.70
+    Edible Mushrooms: 0.80
+    Uncategorised: 0.85
   "my age range":
-    edible apples: 0.86
-    edible stone fruits: 0.80
-    blackberries: 0.84
-    elder trees: 0.88
-    nettles: 0.86
-    wild garlic: 0.70
-    edible mushrooms: 0.80
-    uncategorised: 0.85
+    Edible Apples: 0.86
+    Edible Stone Fruits: 0.80
+    Blackberries: 0.84
+    Elder Trees: 0.88
+    Nettles: 0.86
+    Wild Garlic: 0.70
+    Edible Mushrooms: 0.80
+    Uncategorised: 0.85
