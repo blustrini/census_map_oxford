@@ -13,7 +13,7 @@ reveal_radius_meters: 1400
 blend:
   # Maximum distance to the transparent edge, in metres (1–10000).
   # Radius is multiplied by normalized global knowledge; zero hides the reveal.
-  radius_meters: 1000
+  radius_meters: 500
   # Centre opacity (0–1), independent of the knowledge score.
   # Overlapping locations build up the reveal strength.
   opacity: 1
@@ -41,20 +41,20 @@ circles:
   opacity: 1
   # 0.1–20: 1 = linear fade; higher = faster fading / softer, smaller-looking
   # washes; lower = fuller discs with a more pronounced outer edge.
-  fade_steepness: 3
+  fade_steepness: 10
   # Fraction of the radius kept at full opacity before fading (0–0.99).
   # For example, 0.25 gives a solid inner quarter; 0 fades from the centre.
-  solid_core: 0
+  solid_core: 0.1
   # Use six-digit hex colours from a colour picker. Keep the quotes around #.
   # Omitted categories retain their default colours; category names must match.
   category_colors:
-    Edible Apples: "#b5db80"
-    Edible Stone Fruits: "#e58a9c"
-    Blackberries: "#c28bda"
-    Elder Trees: "#ead28a"
-    Nettles: "#89b9dc"
-    Wild Garlic: "#86d5b0"
-    Edible Mushrooms: "#c5a580"
+    Edible Apples: "#8cb153"
+    Edible Stone Fruits: "#D47A7D"
+    Blackberries: "#323C63"
+    Elder Trees: "#f1dc9b"
+    Nettles: "#345944"
+    Wild Garlic: "#4f7a5c"
+    Edible Mushrooms: "#b65e35"
 
 # Layer names are defined here, not in Python. Use the same names for every
 # age bracket and in the CSV's layer column. Colours above are optional.

@@ -76,7 +76,6 @@ def circle_legend(colors: Mapping[str, str], settings: CircleSettings) -> str:
         + f"<div style='color:#555;margin-top:4px;'>Circle radius: {settings.min_radius_meters:g}–"
         f"{settings.max_radius_meters:g} metres, scaled by age/category knowledge score. "
         "Zero scores are hidden. Colour fades to transparent at the edge.</div>"
-        "<div style='color:#555;'>Scores are illustrative placeholders.</div>"
     )
 
 

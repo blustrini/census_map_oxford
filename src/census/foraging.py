@@ -246,8 +246,7 @@ def _add_reveal_controls(
             "<div style='display:flex;justify-content:space-between;'>"
             "<span>Grayscale</span><span>Full colour</span></div>"
             "<div style='color:#555;margin-top:4px;'>Colour appears near foraging "
-            "locations and fades with distance.</div>"
-            "<div style='color:#555;'>Scores are illustrative placeholders.</div>")
+            "locations and fades with distance.</div>")
             + "</div>"
         )
     )
