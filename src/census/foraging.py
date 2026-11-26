@@ -16,7 +16,9 @@ import pandas as pd
 
 from census.cli import PROJECT_ROOT, add_basemap_arguments
 from census.config import load_config
-from census.foraging_blend import BLEND_GRADIENT_SCRIPT, BlendSettings, load_blend_settings
+from census.foraging_blend import (
+    BLEND_GRADIENT_SCRIPT, BLEND_RADIUS_SCRIPT, BlendSettings, load_blend_settings,
+)
 from census.foraging_circles import (
     CIRCLE_DRAW_SCRIPT, CircleSettings, circle_legend, load_circle_settings,
 )
@@ -340,7 +342,7 @@ def _add_reveal_controls(
             const y = point.y - origin.y;
             const metresPerPixel = Math.cos(latitude * Math.PI / 180)
                 * 2 * Math.PI * 6378137 / (256 * Math.pow(2, foragingMap.getZoom()));
-            const radius = blendStyle.radius_meters * score / metresPerPixel;
+            {BLEND_RADIUS_SCRIPT}
             const opacity = blendStyle.opacity;
             if (opacity <= 0 || radius <= 0) continue;
             {BLEND_GRADIENT_SCRIPT}

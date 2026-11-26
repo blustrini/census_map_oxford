@@ -10,10 +10,60 @@ import unittest
 import folium
 
 from census.foraging import _add_reveal_controls, load_foraging_settings
-from census.foraging_blend import BLEND_GRADIENT_SCRIPT, load_blend_settings
+from census.foraging_blend import (
+    BLEND_GRADIENT_SCRIPT, BLEND_RADIUS_SCRIPT, load_blend_settings,
+)
 
 
 class BlendTests(unittest.TestCase):
+    def test_radius_scaling_settings(self):
+        settings = load_blend_settings({
+            "radius_scaling": "exponential", "radius_at_3.5": 100, "radius_at_7": 900,
+        }, 0.45, 1400)
+        self.assertEqual(settings.radius_scaling, "exponential")
+        self.assertEqual(settings.radius_at_3_5, 100)
+        self.assertEqual(settings.radius_at_7, 900)
+        for config in (
+            {"radius_scaling": "log"}, {"radius_at_3.5": True},
+            {"radius_at_7": float("nan")}, {"radius_at_7": 0},
+            {"radius_at_3.5": 1000, "radius_at_7": 500},
+            {"radius_scaling": "exponential", "radius_at_3.5": 500, "radius_at_7": 500},
+        ):
+            with self.subTest(config=config), self.assertRaises(ValueError):
+                load_blend_settings(config, 0.45, 1400)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js required")
+    def test_radius_curves(self):
+        harness = """
+const assert = require('assert');
+function radiusFor(score, mode, middle, max) {
+    const blendStyle = {radius_scaling: mode, radius_at_3_5: middle, radius_at_7: max};
+    const metresPerPixel = 2;
+""" + BLEND_RADIUS_SCRIPT + """
+    return radius * metresPerPixel;
+}
+for (const mode of ['linear', 'exponential']) {
+    for (const [midpoint, maximum] of [[100, 900], [375, 900], [600, 900], [1, 10000], [9999, 10000]]) {
+        assert.strictEqual(radiusFor(0, mode, midpoint, maximum), 0);
+        assert(Math.abs(radiusFor((3.5 - 1) / 6, mode, midpoint, maximum) - midpoint) < 1e-9);
+        assert(Math.abs(radiusFor(1, mode, midpoint, maximum) - maximum) < 1e-9);
+        let previous = 0;
+        for (let i = 1; i <= 100; i++) {
+            const radius = radiusFor(i / 100, mode, midpoint, maximum);
+            assert(Number.isFinite(radius) && radius >= previous);
+            previous = radius;
+        }
+    }
+}
+const k = 3;
+const anchorRadius = 900 * Math.expm1(k * 5 / 12) / Math.expm1(k);
+assert(Math.abs(radiusFor(0.25, 'exponential', anchorRadius, 900)
+    - 900 * Math.expm1(k * 0.25) / Math.expm1(k)) < 1e-9);
+assert(Math.abs(radiusFor(0.25, 'linear', 600, 900) - 3600 / 7) < 1e-9);
+assert.strictEqual(radiusFor(0.1, 'linear', 100, 900), 0);
+"""
+        subprocess.run(["node", "-e", harness], check=True)
+
     @unittest.skipUnless(shutil.which("node"), "Node.js required")
     def test_all_blend_points_use_global_score(self):
         with tempfile.TemporaryDirectory() as directory:

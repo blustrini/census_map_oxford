@@ -130,7 +130,10 @@ Refresh the HTML to see changes; no basemap rebuild is needed.
 
 | Setting under `blend` | What to tweak |
 | --- | --- |
-| `radius_meters` | Maximum reveal radius in metres (1–10000), default 1400. Actual radius is this value multiplied by the knowledge score; zero scores hide the reveal. |
+| `radius_scaling` | `linear` (default) or `exponential`. Fits the radius curve through the two anchors below. |
+| `radius_at_3.5` | Radius in metres (1–10000) at raw score 3.5 (normalized 5/12); defaults to `radius_meters × 5/12`. |
+| `radius_at_7` | Radius in metres (1–10000) at raw score 7 (normalized 1); defaults to `radius_meters`. Must be at least `radius_at_3.5` (strictly greater for exponential). |
+| `radius_meters` | Legacy maximum radius (1–10000), default 1400; used as the fallback for the new anchors. |
 | `opacity` | Centre reveal strength (0–1), independent of the knowledge score. Default 0.45; overlapping locations build up colour. |
 | `fade_steepness` | 0.1–20, default 2. Higher values fade faster; 1 is linear; below 1 gives fuller patches with more defined edges. |
 | `solid_core` | Fraction of radius held at the centre reveal strength before fading (0–0.99). Default 0; try 0.25 for a broader centre. |
@@ -148,6 +151,24 @@ override top-level `alpha` and `reveal_radius_meters` respectively; omitted
 values fall back to those legacy settings. Keep the top-level settings for
 backward compatibility. Invalid values and unknown settings produce errors.
 The default fade is now a smooth power curve approximating the original fade.
+
+For example, to use exponential radius scaling:
+
+```yaml
+blend:
+  radius_scaling: exponential
+  radius_at_3.5: 100
+  radius_at_7: 500
+```
+
+The anchors refer to raw scores 3.5 and 7. The existing `(score - 1) / 6`
+normalization is unchanged: these map to 5/12 and 1 respectively.
+Linear mode fits a straight line through the anchors and clamps negative radii
+to zero. Exponential mode fits `A × (exp(k × score) - 1)`, so it also passes
+through normalized `(0, 0)` (raw score 1); when the first anchor is 5/12 of
+the maximum, its limit is linear.
+In either mode, zero knowledge hides the reveal. Change the YAML and rerun
+`uv run foraging` to switch modes; circles are unaffected.
 
 ### Styling circles without code
 

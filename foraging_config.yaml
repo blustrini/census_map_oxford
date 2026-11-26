@@ -11,9 +11,15 @@ reveal_radius_meters: 1400
 # Visual controls for --mode blend. These override the legacy settings above.
 # Edit, save, rerun the command, then refresh the output HTML.
 blend:
-  # Maximum distance to the transparent edge, in metres (1–10000).
-  # Radius is multiplied by normalized global knowledge; zero hides the reveal.
-  radius_meters: 500
+  # Choose linear or exponential radius scaling.
+  radius_scaling: exponential
+  # Radius in metres (1–10000) at raw scores 3.5 and 7.
+  # These map to normalized knowledge 5/12 and 1 via (score - 1) / 6.
+  # Exponential curves also pass through (0, 0).
+  # Moderate exponential scaling keeps younger groups visible while separating
+  # the leaders. Approximate radii: 18–24 = 105 m; 55–64 = 834 m; 75+ = 1051 m.
+  radius_at_3.5: 100
+  radius_at_7: 2000
   # Centre opacity (0–1), independent of the knowledge score.
   # Overlapping locations build up the reveal strength.
   opacity: 1
