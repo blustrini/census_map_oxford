@@ -93,6 +93,22 @@ results. Pass `--config` to use another YAML file. Input and output paths can
 be changed with `--foraging-data`, `--output`, and `--color-basemap-image`;
 the grayscale image and metadata options are shared with the age map.
 
+### Changing foraging layers
+
+Layer names come from `knowledge_scores` in `foraging_config.yaml`, not a
+hard-coded Python list. To rename, add or remove a layer, update its entry in
+every age bracket and use the same name in the CSV's `layer` column. Update
+any matching `circles.category_colors` entry too; colours are optional and
+omitted entries receive a default palette colour. No Python changes are needed.
+All age brackets must contain the same layers; CSV layers missing from the
+configuration produce an error. Configured layers with no locations are allowed.
+
+The configuration is prepared for `edible apples`, `edible stone fruits`,
+`blackberries`, `elder trees`, `nettles`, `wild garlic`, `edible mushrooms`, and
+`uncategorised`. The CSV is intentionally
+unchanged here: use the relayered CSV from the data branch before running the
+default command.
+
 ### Styling the blend without code
 
 Edit the commented `blend` section in `foraging_config.yaml`, then regenerate:

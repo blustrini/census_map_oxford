@@ -7,7 +7,9 @@ import subprocess
 import tempfile
 import unittest
 
-from census.foraging import LAYER_COLORS, load_foraging_settings
+from census.foraging import category_colors, load_foraging_settings
+
+LAYER_COLORS = category_colors(["Elder", "Blackberries"])
 from census.foraging_circles import CIRCLE_DRAW_SCRIPT, circle_legend, load_circle_settings
 
 

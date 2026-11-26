@@ -49,7 +49,14 @@ def load_circle_settings(config: object, default_colors: Mapping[str, str]) -> C
         raise ValueError("circles.category_colors must map categories to quoted hex colours")
     for category, color in colors.items():
         if category not in default_colors:
-            raise ValueError(f"Unknown circles.category_colors category: {category!r}")
+            raise ValueError(
+                f"Unknown circles.category_colors category: {category!r}. "
+                "Colour names must match categories defined in knowledge_scores. "
+                f"Configured categories: {sorted(default_colors)}. "
+                "Rename/remove this colour entry, or add the category to every "
+                "knowledge_scores age bracket and use the same name in the CSV layer column. "
+                "Colour entries may be omitted to use default colours."
+            )
         if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
             raise ValueError(f"Colour for {category!r} must be a quoted hex colour like '#80718c'")
     return CircleSettings(**values, category_colors={**default_colors, **colors})
