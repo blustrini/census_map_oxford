@@ -16,17 +16,16 @@ blend:
   # Radius in metres (1–10000) at raw scores 3.5 and 7.
   # These map to normalized knowledge 5/12 and 1 via (score - 1) / 6.
   # Exponential curves also pass through (0, 0).
-  # Moderate exponential scaling keeps younger groups visible while separating
-  # the leaders. Approximate radii: 18–24 = 105 m; 55–64 = 834 m; 75+ = 1051 m.
-  radius_at_3.5: 100
-  radius_at_7: 2000
+  # Moderate exponential scaling keeps younger groups visible while separating the leaders. 
+  radius_at_3.5: 75
+  radius_at_7: 1650
   # Centre opacity (0–1), independent of the knowledge score.
   # Overlapping locations build up the reveal strength.
   opacity: 1
   # 0.1–20: higher fades faster; 1 is linear; below 1 gives fuller patches.
   fade_steepness: 2
   # Fraction of radius kept at full configured opacity before fading (0–0.99).
-  solid_core: 0
+  solid_core: 0.25
   # Colour adjustments to the revealed map only (0–3, 1 = unchanged).
   # Saturation: 0 = grayscale, above 1 = more vivid colours.
   saturation: 1
