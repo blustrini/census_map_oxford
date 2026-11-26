@@ -84,7 +84,9 @@ first configured age bracket; selecting a more knowledgeable bracket brings
 more of the city to life. Knowledge scores are left independent of styling.
 
 Reveal settings are loaded from `foraging_config.yaml`. `knowledge_scores`
-contains a 0-to-1 value for every age-bracket/category pair; `alpha` sets the
+contains a numeric value from 1 to 7 for every age-bracket/category pair. Scores
+are normalized on loading using `(score - 1) / 6`: 1 becomes 0 (hidden), 4
+becomes 0.5, and 7 becomes 1. Fractional scores are allowed. `alpha` sets the
 maximum reveal strength, and `reveal_radius_meters` controls how far colour
 spreads from each location. The checked-in scores are illustrative
 placeholders, deliberately set so older brackets score higher across all
@@ -121,8 +123,8 @@ Refresh the HTML to see changes; no basemap rebuild is needed.
 
 | Setting under `blend` | What to tweak |
 | --- | --- |
-| `radius_meters` | Reveal radius in metres (1–10000), default 1400. Knowledge affects opacity, not radius. |
-| `opacity` | Maximum centre reveal strength (0–1), multiplied by the knowledge score. Default 0.45; overlapping locations build up colour. |
+| `radius_meters` | Maximum reveal radius in metres (1–10000), default 1400. Actual radius is this value multiplied by the knowledge score; zero scores hide the reveal. |
+| `opacity` | Centre reveal strength (0–1), independent of the knowledge score. Default 0.45; overlapping locations build up colour. |
 | `fade_steepness` | 0.1–20, default 2. Higher values fade faster; 1 is linear; below 1 gives fuller patches with more defined edges. |
 | `solid_core` | Fraction of radius held at the centre reveal strength before fading (0–0.99). Default 0; try 0.25 for a broader centre. |
 | `saturation` | Revealed colour intensity (0–3): 0 is grayscale, 1 unchanged, above 1 more vivid. Default 0.75. |

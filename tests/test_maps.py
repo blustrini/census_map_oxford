@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import geopandas as gpd
+import yaml
 from shapely.geometry import box
 from PIL import Image
 
@@ -178,8 +179,8 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         config.write_text(json.dumps({
             "alpha": 0.75, "reveal_radius_meters": 900,
             "knowledge_scores": {
-                "Young": {"new plant": 0.2},
-                "Older": {"new plant": 0.8},
+                "Young": {"new plant": 2.5},
+                "Older": {"new plant": 5.5},
             },
         }))
         settings = foraging.load_foraging_settings(config)
@@ -188,10 +189,47 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         self.assertEqual(
             settings.knowledge_scores,
             {
-                "Young": {"new plant": 0.2},
-                "Older": {"new plant": 0.8},
+                "Young": {"new plant": 0.25},
+                "Older": {"new plant": 0.75},
             },
         )
+
+    def test_foraging_score_range_and_normalization(self):
+        path = self.root / "scores.yaml"
+        for score in (1, 2, 3, 4, 5, 6, 7, 3.5):
+            with self.subTest(score=score):
+                path.write_text(json.dumps({
+                    "alpha": 0.45, "reveal_radius_meters": 1400,
+                    "knowledge_scores": {"All": {"plant": score}},
+                }))
+                settings = foraging.load_foraging_settings(path)
+                self.assertEqual(settings.knowledge_scores["All"]["plant"],
+                                 (score - 1) / 6)
+
+    def test_invalid_foraging_scores_are_rejected(self):
+        path = self.root / "scores.yaml"
+        for score in (0, 0.5, -1, 0.999, 7.001, 8, True, False,
+                      "4", None, [], {}, float("nan"), float("inf"), -float("inf")):
+            with self.subTest(score=score):
+                path.write_text(json.dumps({
+                    "alpha": 0.45, "reveal_radius_meters": 1400,
+                    "knowledge_scores": {"All": {"valid": 4, "plant": score}},
+                }))
+                with self.assertRaisesRegex(ValueError, "between 1 and 7"):
+                    foraging.load_foraging_settings(path)
+
+    def test_checked_in_foraging_scores_are_between_one_and_seven(self):
+        path = Path(__file__).resolve().parents[1] / "foraging_config.yaml"
+        config = yaml.safe_load(path.read_text())
+        settings = foraging.load_foraging_settings(path)
+        for bracket, scores in config["knowledge_scores"].items():
+            for category, score in scores.items():
+                with self.subTest(bracket=bracket, category=category):
+                    self.assertNotIsInstance(score, bool)
+                    self.assertIsInstance(score, (int, float))
+                    self.assertTrue(1 <= score <= 7)
+                    self.assertAlmostEqual(settings.knowledge_scores[bracket][category],
+                                           (score - 1) / 6)
 
     def test_foraging_modes_lighten_only_the_background(self):
         locations = self.root / "locations.csv"
@@ -215,7 +253,7 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         config = self.root / "custom.yaml"
         config.write_text(json.dumps({
             "alpha": 0.5, "reveal_radius_meters": 900,
-            "knowledge_scores": {"All": {"future plant": 0.7, "absent plant": 0.2}},
+            "knowledge_scores": {"All": {"future plant": 5.2, "absent plant": 2.2}},
             "circles": {"category_colors": {"future plant": "#123456"}},
         }))
         settings = foraging.load_foraging_settings(config)
@@ -238,10 +276,10 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
 
     def test_age_brackets_must_have_matching_layers(self):
         config = self.root / "mismatched.yaml"
-        for scores in ({"new plant": 0.5}, {"future plant": 0.5, "new plant": 0.2}):
+        for scores in ({"new plant": 4}, {"future plant": 4, "new plant": 2}):
             config.write_text(json.dumps({
                 "alpha": 0.5, "reveal_radius_meters": 900,
-                "knowledge_scores": {"Young": {"future plant": 0.2}, "Older": scores},
+                "knowledge_scores": {"Young": {"future plant": 2}, "Older": scores},
             }))
             with self.assertRaisesRegex(ValueError, "Invalid categories") as error:
                 foraging.load_foraging_settings(config)
@@ -255,7 +293,7 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         config = self.root / "stale-colour.yaml"
         config.write_text(json.dumps({
             "alpha": 0.5, "reveal_radius_meters": 900,
-            "knowledge_scores": {"All": {"elder trees": 0.5}},
+            "knowledge_scores": {"All": {"elder trees": 4}},
             "circles": {"category_colors": {"edler trees": "#123456"}},
         }))
         with self.assertRaises(ValueError) as error:

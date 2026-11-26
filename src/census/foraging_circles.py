@@ -81,7 +81,7 @@ def circle_legend(colors: Mapping[str, str], settings: CircleSettings) -> str:
 
 
 # Uses the canvas, selected categories and geographic projection supplied by the
-# shared foraging renderer. Unlike blend mode, knowledge controls radius, not alpha.
+# shared foraging renderer. Knowledge controls radius, not alpha, in both modes.
 CIRCLE_DRAW_SCRIPT = """
         for (const layer of selectedCategories) {
             const score = knowledgeScores[age][layer];

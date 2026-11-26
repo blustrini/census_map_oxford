@@ -38,7 +38,7 @@ class CircleTests(unittest.TestCase):
     def test_old_and_new_yaml(self):
         config = {
             "alpha": 0.45, "reveal_radius_meters": 1400,
-            "knowledge_scores": {"All": dict.fromkeys(LAYER_COLORS, 0.5)},
+            "knowledge_scores": {"All": dict.fromkeys(LAYER_COLORS, 4)},
         }
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.yaml"

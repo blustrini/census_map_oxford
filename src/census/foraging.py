@@ -132,16 +132,14 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
                 isinstance(score, bool)
                 or not isinstance(score, (int, float))
                 or not math.isfinite(score)
-                or not 0 <= score <= 1
+                or not 1 <= score <= 7
             ):
                 raise ValueError(
                     f"knowledge_scores[{age_bracket!r}][{layer!r}] "
-                    f"must be a finite number between 0 and 1; received {score!r}. "
-                    "Use an unquoted numeric score (0 hides this category)."
+                    f"must be a finite number between 1 and 7; received {score!r}. "
+                    "Use an unquoted numeric score (1 hides this category)."
                 )
-            validated_category_scores[layer] = float(score)
-        if not any(validated_category_scores.values()):
-            raise ValueError(f"Age bracket {age_bracket!r} needs at least one positive score")
+            validated_category_scores[layer] = (float(score) - 1) / 6
         validated_scores[age_bracket] = validated_category_scores
 
     return ForagingMapSettings(
@@ -341,8 +339,8 @@ def _add_reveal_controls(
             const y = point.y - origin.y;
             const metresPerPixel = Math.cos(latitude * Math.PI / 180)
                 * 2 * Math.PI * 6378137 / (256 * Math.pow(2, foragingMap.getZoom()));
-            const radius = blendStyle.radius_meters / metresPerPixel;
-            const opacity = blendStyle.opacity * score;
+            const radius = blendStyle.radius_meters * score / metresPerPixel;
+            const opacity = blendStyle.opacity;
             if (opacity <= 0 || radius <= 0) continue;
             {BLEND_GRADIENT_SCRIPT}
             mask.fillStyle = gradient;

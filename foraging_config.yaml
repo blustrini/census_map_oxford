@@ -1,5 +1,6 @@
 # Illustrative placeholders only. Replace these with age-bracket survey results.
-# Scores are relative foraging-knowledge values per category from 0 to 1.
+# Scores are foraging-confidence values per category from 1 to 7 (inclusive).
+# Parsed as (score - 1) / 6 internally: 1 = hidden, 7 = maximum knowledge.
 # Older age brackets currently score higher across all categories by design.
 # Gentle washes: overlapping locations gradually build up colour.
 alpha: 0.45
@@ -10,10 +11,10 @@ reveal_radius_meters: 1400
 # Visual controls for --mode blend. These override the legacy settings above.
 # Edit, save, rerun the command, then refresh the output HTML.
 blend:
-  # Distance from each location to the transparent edge, in metres (1–10000).
-  # Knowledge changes opacity, not radius, in blend mode.
+  # Maximum distance to the transparent edge, in metres (1–10000).
+  # Radius is multiplied by the knowledge score; a zero score hides the reveal.
   radius_meters: 1000
-  # Maximum centre opacity, multiplied by the knowledge score (0–1).
+  # Centre opacity (0–1), independent of the knowledge score.
   # Overlapping locations build up the reveal strength.
   opacity: 1
   # 0.1–20: higher fades faster; 1 is linear; below 1 gives fuller patches.
@@ -60,38 +61,38 @@ circles:
 # age bracket and in the CSV's layer column. Colours above are optional.
 knowledge_scores:
   "18-34":
-    Edible Apples: 0.12
-    Edible Stone Fruits: 0.10
-    Blackberries: 0.18
-    Elder Trees: 0.14
-    Nettles: 0.10
-    Wild Garlic: 0.13
-    Edible Mushrooms: 0.10
-    Uncategorised: 0.13
+    Edible Apples: 1.72
+    Edible Stone Fruits: 1.60
+    Blackberries: 2.08
+    Elder Trees: 1.84
+    Nettles: 1.60
+    Wild Garlic: 1.78
+    Edible Mushrooms: 1.60
+    Uncategorised: 1.78
   "35-54":
-    Edible Apples: 0.30
-    Edible Stone Fruits: 0.34
-    Blackberries: 0.32
-    Elder Trees: 0.35
-    Nettles: 0.38
-    Wild Garlic: 0.40
-    Edible Mushrooms: 0.30
-    Uncategorised: 0.32
+    Edible Apples: 2.80
+    Edible Stone Fruits: 3.04
+    Blackberries: 2.92
+    Elder Trees: 3.10
+    Nettles: 3.28
+    Wild Garlic: 3.40
+    Edible Mushrooms: 2.80
+    Uncategorised: 2.92
   "55+":
-    Edible Apples: 0.86
-    Edible Stone Fruits: 0.80
-    Blackberries: 0.84
-    Elder Trees: 0.88
-    Nettles: 0.86
-    Wild Garlic: 0.70
-    Edible Mushrooms: 0.80
-    Uncategorised: 0.85
+    Edible Apples: 6.16
+    Edible Stone Fruits: 5.80
+    Blackberries: 6.04
+    Elder Trees: 6.28
+    Nettles: 6.16
+    Wild Garlic: 5.20
+    Edible Mushrooms: 5.80
+    Uncategorised: 6.10
   "my age range":
-    Edible Apples: 0.86
-    Edible Stone Fruits: 0.80
-    Blackberries: 0.84
-    Elder Trees: 0.88
-    Nettles: 0.86
-    Wild Garlic: 0.70
-    Edible Mushrooms: 0.80
-    Uncategorised: 0.85
+    Edible Apples: 6.16
+    Edible Stone Fruits: 5.80
+    Blackberries: 6.04
+    Elder Trees: 6.28
+    Nettles: 6.16
+    Wild Garlic: 5.20
+    Edible Mushrooms: 5.80
+    Uncategorised: 6.10
