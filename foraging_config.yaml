@@ -15,7 +15,7 @@ blend:
   radius_meters: 1000
   # Maximum centre opacity, multiplied by the knowledge score (0–1).
   # Overlapping locations build up the reveal strength.
-  opacity: 0.45
+  opacity: 1
   # 0.1–20: higher fades faster; 1 is linear; below 1 gives fuller patches.
   fade_steepness: 2
   # Fraction of radius kept at full configured opacity before fading (0–0.99).
@@ -37,7 +37,7 @@ circles:
   min_radius_meters: 280
   max_radius_meters: 840
   # 0 = invisible, 1 = opaque at the centre. Overlaps build up colour.
-  opacity: 0.45
+  opacity: 1
   # 0.1–20: 1 = linear fade; higher = faster fading / softer, smaller-looking
   # washes; lower = fuller discs with a more pronounced outer edge.
   fade_steepness: 3
@@ -47,13 +47,13 @@ circles:
   # Use six-digit hex colours from a colour picker. Keep the quotes around #.
   # Omitted categories retain their default colours; category names must match.
   category_colors:
-    Apples and Pears: "#8a9b68"
-    Blackberries: "#80718c"
-    Cherries, plums, damsons: "#b18086"
-    Sloes, blackthorn and hawthorn: "#708b91"
-    Elder: "#b5a568"
-    Additions in 2017: "#719381"
-    Uncategorised: "#969487"
+    Apples and Pears: "#b5db80"
+    Blackberries: "#c28bda"
+    Cherries, plums, damsons: "#e58a9c"
+    Sloes, blackthorn and hawthorn: "#89b9dc"
+    Elder: "#ead28a"
+    Additions in 2017: "#86d5b0"
+    Uncategorised: "#ccc6b8"
 
 knowledge_scores:
   "18-34":
@@ -73,6 +73,14 @@ knowledge_scores:
     Additions in 2017: 0.40
     Uncategorised: 0.32
   "55+":
+    Apples and Pears: 0.86
+    Blackberries: 0.84
+    Cherries, plums, damsons: 0.80
+    Sloes, blackthorn and hawthorn: 0.86
+    Elder: 0.88
+    Additions in 2017: 0.70
+    Uncategorised: 0.85
+  "my age range":
     Apples and Pears: 0.86
     Blackberries: 0.84
     Cherries, plums, damsons: 0.80
