@@ -47,44 +47,51 @@ circles:
   # Use six-digit hex colours from a colour picker. Keep the quotes around #.
   # Omitted categories retain their default colours; category names must match.
   category_colors:
-    Apples and Pears: "#b5db80"
-    Blackberries: "#c28bda"
-    Cherries, plums, damsons: "#e58a9c"
-    Sloes, blackthorn and hawthorn: "#89b9dc"
-    Elder: "#ead28a"
-    Additions in 2017: "#86d5b0"
-    Uncategorised: "#ccc6b8"
+    edible apples: "#b5db80"
+    edible stone fruits: "#e58a9c"
+    blackberries: "#c28bda"
+    elder trees: "#ead28a"
+    nettles: "#89b9dc"
+    wild garlic: "#86d5b0"
+    edible mushrooms: "#c5a580"
+    uncategorised: "#ccc6b8"
 
+# Layer names are defined here, not in Python. Use the same names for every
+# age bracket and in the CSV's layer column. Colours above are optional.
 knowledge_scores:
   "18-34":
-    Apples and Pears: 0.12
-    Blackberries: 0.18
-    Cherries, plums, damsons: 0.10
-    Sloes, blackthorn and hawthorn: 0.10
-    Elder: 0.14
-    Additions in 2017: 0.13
-    Uncategorised: 0.13
+    edible apples: 0.12
+    edible stone fruits: 0.10
+    blackberries: 0.18
+    elder trees: 0.14
+    nettles: 0.10
+    wild garlic: 0.13
+    edible mushrooms: 0.10
+    uncategorised: 0.13
   "35-54":
-    Apples and Pears: 0.30
-    Blackberries: 0.32
-    Cherries, plums, damsons: 0.34
-    Sloes, blackthorn and hawthorn: 0.38
-    Elder: 0.35
-    Additions in 2017: 0.40
-    Uncategorised: 0.32
+    edible apples: 0.30
+    edible stone fruits: 0.34
+    blackberries: 0.32
+    elder trees: 0.35
+    nettles: 0.38
+    wild garlic: 0.40
+    edible mushrooms: 0.30
+    uncategorised: 0.32
   "55+":
-    Apples and Pears: 0.86
-    Blackberries: 0.84
-    Cherries, plums, damsons: 0.80
-    Sloes, blackthorn and hawthorn: 0.86
-    Elder: 0.88
-    Additions in 2017: 0.70
-    Uncategorised: 0.85
+    edible apples: 0.86
+    edible stone fruits: 0.80
+    blackberries: 0.84
+    elder trees: 0.88
+    nettles: 0.86
+    wild garlic: 0.70
+    edible mushrooms: 0.80
+    uncategorised: 0.85
   "my age range":
-    Apples and Pears: 0.86
-    Blackberries: 0.84
-    Cherries, plums, damsons: 0.80
-    Sloes, blackthorn and hawthorn: 0.86
-    Elder: 0.88
-    Additions in 2017: 0.70
-    Uncategorised: 0.85
+    edible apples: 0.86
+    edible stone fruits: 0.80
+    blackberries: 0.84
+    elder trees: 0.88
+    nettles: 0.86
+    wild garlic: 0.70
+    edible mushrooms: 0.80
+    uncategorised: 0.85

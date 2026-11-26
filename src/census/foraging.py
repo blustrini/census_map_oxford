@@ -27,15 +27,19 @@ LATITUDE_COLUMN = "latitude"
 LONGITUDE_COLUMN = "longitude"
 REQUIRED_COLUMNS = {LAYER_COLUMN, LATITUDE_COLUMN, LONGITUDE_COLUMN}
 
-LAYER_COLORS = {
-    "Apples and Pears": "#8a9b68",
-    "Blackberries": "#80718c",
-    "Cherries, plums, damsons": "#b18086",
-    "Sloes, blackthorn and hawthorn": "#708b91",
-    "Elder": "#b5a568",
-    "Additions in 2017": "#719381",
-    "Uncategorised": "#969487",
-}
+DEFAULT_CATEGORY_COLORS = (
+    "#8a9b68", "#80718c", "#b18086", "#708b91", "#b5a568", "#719381", "#969487",
+)
+
+
+def category_colors(categories: Sequence[str]) -> dict[str, str]:
+    """Assign a default palette without tying Python code to layer names."""
+    return {
+        category: DEFAULT_CATEGORY_COLORS[index % len(DEFAULT_CATEGORY_COLORS)]
+        for index, category in enumerate(categories)
+    }
+
+
 FORAGING_SETTING_KEYS = {"alpha", "reveal_radius_meters", "knowledge_scores"}
 DEFAULT_ALPHA = 0.45
 DEFAULT_REVEAL_RADIUS_METERS = 1400
@@ -49,6 +53,14 @@ class ForagingMapSettings:
     knowledge_scores: Mapping[str, Mapping[str, float]]
     circles: CircleSettings = field(default_factory=CircleSettings)
     blend: BlendSettings | None = None
+
+    @property
+    def categories(self) -> list[str]:
+        return list(next(iter(self.knowledge_scores.values())))
+
+    @property
+    def colors(self) -> dict[str, str]:
+        return {**category_colors(self.categories), **self.circles.category_colors}
 
 
 def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
@@ -84,9 +96,20 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
             or not isinstance(category_scores, dict)
             or not all(isinstance(layer, str) for layer in category_scores)
         ):
-            raise ValueError("Each knowledge_scores entry must be an age bracket mapping")
-        missing_layers = LAYER_COLORS.keys() - category_scores.keys()
-        unexpected_layers = category_scores.keys() - LAYER_COLORS.keys()
+            raise ValueError(
+                f"Invalid knowledge_scores entry {age_bracket!r}: expected a non-empty "
+                "age-bracket name mapped to category names (strings) and numeric scores. "
+                f"Received {category_scores!r}."
+            )
+        if not category_scores or any(not layer.strip() for layer in category_scores):
+            raise ValueError(
+                f"knowledge_scores[{age_bracket!r}] must contain at least one category, "
+                "and every category name must be a non-empty string. "
+                f"Received category names: {list(category_scores)!r}."
+            )
+        expected_layers = next(iter(validated_scores.values()), category_scores).keys()
+        missing_layers = expected_layers - category_scores.keys()
+        unexpected_layers = category_scores.keys() - expected_layers
         if missing_layers or unexpected_layers:
             details = []
             if missing_layers:
@@ -96,7 +119,11 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
             raise ValueError(
                 f"Invalid categories for age bracket {age_bracket!r} ("
                 + "; ".join(details)
-                + ")"
+                + f"). All age brackets must contain the same categories as the first "
+                f"age bracket {next(iter(knowledge_scores))!r}: {sorted(expected_layers)}. "
+                "Add missing entries or rename/remove extra entries in knowledge_scores; "
+                "when changing a layer, update every age bracket, the CSV layer column, "
+                "and any circles.category_colors entry."
             )
 
         validated_category_scores: dict[str, float] = {}
@@ -109,7 +136,8 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
             ):
                 raise ValueError(
                     f"knowledge_scores[{age_bracket!r}][{layer!r}] "
-                    "must be a number between 0 and 1"
+                    f"must be a finite number between 0 and 1; received {score!r}. "
+                    "Use an unquoted numeric score (0 hides this category)."
                 )
             validated_category_scores[layer] = float(score)
         if not any(validated_category_scores.values()):
@@ -120,12 +148,16 @@ def load_foraging_settings(config_path: Path) -> ForagingMapSettings:
         alpha=float(alpha),
         reveal_radius_meters=reveal_radius_meters,
         knowledge_scores=validated_scores,
-        circles=load_circle_settings(config.get("circles", {}), LAYER_COLORS),
+        circles=load_circle_settings(
+            config.get("circles", {}), category_colors(list(next(iter(validated_scores.values())))),
+        ),
         blend=load_blend_settings(config.get("blend", {}), alpha, reveal_radius_meters),
     )
 
 
-def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
+def load_foraging_locations(
+    csv_path: Path, categories: Sequence[str] | None = None,
+) -> pd.DataFrame:
     """Read foraging locations and validate the fields used to render markers."""
     locations = pd.read_csv(csv_path)
     missing_columns = REQUIRED_COLUMNS - set(locations.columns)
@@ -151,7 +183,10 @@ def load_foraging_locations(csv_path: Path) -> pd.DataFrame:
     if not locations[LONGITUDE_COLUMN].between(-180, 180).all():
         raise ValueError("Foraging longitudes must be between -180 and 180")
 
-    unknown_layers = sorted(set(locations[LAYER_COLUMN]) - LAYER_COLORS.keys())
+    unknown_layers = (
+        sorted(set(locations[LAYER_COLUMN]) - set(categories))
+        if categories is not None else []
+    )
     if unknown_layers:
         raise ValueError(f"Foraging data contains unknown layers: {unknown_layers}")
     return locations
@@ -170,7 +205,7 @@ def _add_reveal_controls(
     blend = settings.blend or BlendSettings(
         opacity=settings.alpha, radius_meters=settings.reveal_radius_meters,
     )
-    categories = sorted(LAYER_COLORS)
+    categories = sorted(settings.categories)
     first_option = "<option value='__all__'>All categories</option>"
     category_options = first_option + "".join(
         f"<option value='{escape(category, quote=True)}'>"
@@ -204,7 +239,7 @@ def _add_reveal_controls(
             "<div style='position:fixed;bottom:24px;right:10px;z-index:9999;"
             "background:rgba(250,251,247,.95);padding:12px 14px;border-radius:8px;"
             "color:#39473c;box-shadow:0 2px 12px #34433420;font:12px/1.5 sans-serif;width:230px;'>"
-             + (circle_legend({**LAYER_COLORS, **settings.circles.category_colors}, settings.circles) if mode == "circles" else
+             + (circle_legend(settings.colors, settings.circles) if mode == "circles" else
             "<strong>Colour reveal</strong>"
             "<div style='height:14px;margin:6px 0 2px;background:linear-gradient("
             "to right,#bdbdbd 0%,#f2f2f2 45%,#dce9d3 55%,#438e55 100%);'></div>"
@@ -234,7 +269,7 @@ def _add_reveal_controls(
     const foragingMap = {map_view.get_name()};
     const colorOverlay = {color_overlay.get_name() if color_overlay else 'null'};
     const renderMode = {json.dumps(mode)};
-    const categoryColors = {json.dumps({**LAYER_COLORS, **settings.circles.category_colors})};
+    const categoryColors = {json.dumps(settings.colors)};
     const circleStyle = {json.dumps(asdict(settings.circles))};
     const blendStyle = {json.dumps(asdict(blend))};
     const imageBounds = {json.dumps(image_bounds)};
@@ -382,15 +417,17 @@ def create_foraging_map(
     """Render a blend or category circles; return plotted/excluded counts."""
     if mode not in RENDER_MODES:
         raise ValueError(f"Unknown foraging mode {mode!r}; choose from {RENDER_MODES}")
+    locations = load_foraging_locations(
+        foraging_data_path, settings.categories if settings is not None else None,
+    )
     if settings is None:
         settings = ForagingMapSettings(
             alpha=DEFAULT_ALPHA,
             reveal_radius_meters=DEFAULT_REVEAL_RADIUS_METERS,
             knowledge_scores={
-                "All ages": {layer: 1.0 for layer in LAYER_COLORS}
+                "All ages": {layer: 1.0 for layer in locations[LAYER_COLUMN].unique()}
             },
         )
-    locations = load_foraging_locations(foraging_data_path)
     image_bounds = load_basemap_bounds(basemap_metadata_path, basemap_image_path)
     color_image_path = _load_color_basemap_path(
         basemap_metadata_path,
@@ -434,7 +471,7 @@ def create_foraging_map(
         color_overlay.add_to(map_view)
 
     locations_by_category: dict[str, list[list[float]]] = {}
-    for category in LAYER_COLORS:
+    for category in settings.categories:
         category_locations = in_bounds.loc[in_bounds[LAYER_COLUMN] == category]
         locations_by_category[category] = [
             [float(location[LATITUDE_COLUMN]), float(location[LONGITUDE_COLUMN])]

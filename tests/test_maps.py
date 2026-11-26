@@ -178,8 +178,8 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         config.write_text(json.dumps({
             "alpha": 0.75, "reveal_radius_meters": 900,
             "knowledge_scores": {
-                "Young": dict.fromkeys(foraging.LAYER_COLORS, 0.2),
-                "Older": dict.fromkeys(foraging.LAYER_COLORS, 0.8),
+                "Young": {"new plant": 0.2},
+                "Older": {"new plant": 0.8},
             },
         }))
         settings = foraging.load_foraging_settings(config)
@@ -188,8 +188,8 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
         self.assertEqual(
             settings.knowledge_scores,
             {
-                "Young": dict.fromkeys(foraging.LAYER_COLORS, 0.2),
-                "Older": dict.fromkeys(foraging.LAYER_COLORS, 0.8),
+                "Young": {"new plant": 0.2},
+                "Older": {"new plant": 0.8},
             },
         )
 
@@ -210,6 +210,60 @@ assert.strictEqual(layers[0].feature.properties.age_range_population, 101);
                     ".foraging-basemap { filter: brightness(1.12); }", html,
                 )
                 self.assertEqual(html.count('"className": "foraging-basemap"'), 1)
+
+    def test_custom_layers_render_in_both_modes(self):
+        config = self.root / "custom.yaml"
+        config.write_text(json.dumps({
+            "alpha": 0.5, "reveal_radius_meters": 900,
+            "knowledge_scores": {"All": {"future plant": 0.7, "absent plant": 0.2}},
+            "circles": {"category_colors": {"future plant": "#123456"}},
+        }))
+        settings = foraging.load_foraging_settings(config)
+        locations = self.root / "custom.csv"
+        pd.DataFrame({
+            "layer": ["future plant"], "latitude": [51.75], "longitude": [-1.25],
+        }).to_csv(locations, index=False)
+        for mode in foraging.RENDER_MODES:
+            with self.subTest(mode=mode):
+                output = self.root / f"custom-{mode}.html"
+                self.assertEqual(foraging.create_foraging_map(
+                    locations, output, self.image, self.metadata, settings, mode=mode,
+                ), (1, 0))
+                html = output.read_text()
+                self.assertIn("future plant", html)
+                self.assertIn("absent plant", html)
+                self.assertIn("#123456", html)
+        with self.assertRaisesRegex(ValueError, "unknown layers"):
+            foraging.load_foraging_locations(locations, ["different plant"])
+
+    def test_age_brackets_must_have_matching_layers(self):
+        config = self.root / "mismatched.yaml"
+        for scores in ({"new plant": 0.5}, {"future plant": 0.5, "new plant": 0.2}):
+            config.write_text(json.dumps({
+                "alpha": 0.5, "reveal_radius_meters": 900,
+                "knowledge_scores": {"Young": {"future plant": 0.2}, "Older": scores},
+            }))
+            with self.assertRaisesRegex(ValueError, "Invalid categories") as error:
+                foraging.load_foraging_settings(config)
+            message = str(error.exception)
+            self.assertIn("'Older'", message)
+            self.assertIn("first age bracket 'Young'", message)
+            self.assertIn("new plant", message)
+            self.assertIn("update every age bracket", message)
+
+    def test_stale_palette_entry_explains_how_to_fix_it(self):
+        config = self.root / "stale-colour.yaml"
+        config.write_text(json.dumps({
+            "alpha": 0.5, "reveal_radius_meters": 900,
+            "knowledge_scores": {"All": {"elder trees": 0.5}},
+            "circles": {"category_colors": {"edler trees": "#123456"}},
+        }))
+        with self.assertRaises(ValueError) as error:
+            foraging.load_foraging_settings(config)
+        message = str(error.exception)
+        for detail in ("circles.category_colors", "edler trees", "elder trees",
+                       "Rename/remove", "every knowledge_scores age bracket"):
+            self.assertIn(detail, message)
 
 
 if __name__ == "__main__":

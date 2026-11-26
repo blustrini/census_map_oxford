@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-from census.foraging import LAYER_COLORS, load_foraging_settings
+from census.foraging import load_foraging_settings
 from census.foraging_blend import BLEND_GRADIENT_SCRIPT, load_blend_settings
 
 
@@ -17,7 +17,7 @@ class BlendTests(unittest.TestCase):
             path = Path(directory) / "settings.yaml"
             config = {
                 "alpha": 0.7, "reveal_radius_meters": 900,
-                "knowledge_scores": {"All": dict.fromkeys(LAYER_COLORS, 0.5)},
+                "knowledge_scores": {"All": {"wild garlic": 0.5}},
             }
             path.write_text(json.dumps(config))
             settings = load_foraging_settings(path).blend
